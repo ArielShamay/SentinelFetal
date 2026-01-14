@@ -73,6 +73,19 @@ class CTGRecord:
     metadata: dict[str, Any] = field(default_factory=dict)
     
     @property
+    def fhr(self) -> np.ndarray:
+        """
+        Alias for fhr1 (primary FHR signal).
+        
+        Provides generic access to the primary FHR signal for code
+        that doesn't need to distinguish between fhr1 and fhr2.
+        
+        Returns:
+            numpy.ndarray: Primary fetal heart rate signal.
+        """
+        return self.fhr1
+    
+    @property
     def timestamps(self) -> np.ndarray:
         """
         Generate timestamp array in seconds.
