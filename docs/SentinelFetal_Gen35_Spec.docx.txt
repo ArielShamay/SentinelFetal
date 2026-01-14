@@ -1,0 +1,1691 @@
+﻿SentinelFetal Gen3.5 - מפרט טכני מלא | גרסה 1.0
+SentinelFetal
+Gen3.5
+הגשר הפרגמטי: שילוב מודלי יסוד עם מנוע חוקים רפואיים
+מסמך מפרט טכני מלא
+גרסה 1.0 | ינואר 2026
+צוות SentinelFetal - אוניברסיטת אריאל
+אברהם אביטן | צהר לארי | יובל דידי | אריאל שמאי
+________________
+
+
+תקציר מנהלים: למה Gen3.5?
+הבעיות בתוכנית Gen4 המקורית
+תוכנית Gen4 הציגה ארכיטקטורה מרשימה של MOMENT + Mamba, אך סבלה ממספר בעיות קריטיות:
+בעיה
+	פירוט
+	מורכבות יתר
+	דרישה לאימון 4 מודלים נפרדים: CleanCTG, CTGGAN, MOMENT, Mamba - כל אחד עם אתגרים משלו
+	תלות במאגרים מרובים
+	4 מאגרי נתונים שונים (CTU-UHB, NInFEA, FHRMA, CTGGAN) - כל אחד עם פורמט ועיבוד שונה
+	סיכון גבוה ב-ONNX
+	ייצוא Mamba ל-ONNX מורכב מאוד - אין פתרון מוכן, עלול לחסום את כל הפרויקט
+	לוח זמנים לא ריאלי
+	7 שבועות לצוות מנוסה, אך לצוות סטודנטים - צפי ריאלי של 3-4 חודשים
+	חסר מנוע הסברים
+	Gen4 התמקד בביצועים סטטיסטיים אך הזניח את ה-XAI והקריטריונים הרפואיים הישראליים
+	אין Fallback
+	אם המודל כושל - אין מנגנון גיבוי. מערכת רפואית חייבת להיות אמינה 100%
+	הפתרון: Gen3.5 - הגשר הפרגמטי
+Gen3.5 שומרת על החדשנות של שימוש במודל Foundation (MOMENT) אך בגישה פרגמטית יותר:
+יתרון
+	פירוט
+	MOMENT Zero-Shot
+	שימוש ב-MOMENT ללא Fine-tuning - המודל כבר יודע לזהות anomalies ו-patterns
+	מנוע חוקים רפואיים
+	אלגוריתמים דטרמיניסטיים מנייר העמדה הישראלי - 100% שקיפות ואמינות
+	מאגר נתונים יחיד
+	CTU-UHB בלבד - מפשט דרמטית את ה-Data Pipeline
+	ללא Mamba
+	מבטל את הסיכון של ייצוא ONNX מורכב
+	XAI מובנה
+	כל התראה מוסברת במונחים רפואיים ברורים
+	לוח זמנים ריאלי
+	3-4 שבועות במקום 7+ - סיכוי הצלחה של 70% במקום 15%
+	השוואה מסכמת
+היבט
+	Gen4
+	Gen3.5
+	מודל Foundation
+	MOMENT + Fine-tuning + LoRA
+	MOMENT Zero-Shot (ללא אימון)
+	טיפול ברצף ארוך
+	Mamba (מורכב)
+	Sliding Window + Rule-Based
+	מאגרי נתונים
+	4 מאגרים
+	מאגר אחד (CTU-UHB)
+	אימון GAN
+	נדרש CTGGAN
+	לא נדרש (Class Weights)
+	הסברתיות (XAI)
+	חלקית
+	מלאה - מנייר העמדה
+	זמן פיתוח
+	7+ שבועות
+	3-4 שבועות
+	סיכוי הצלחה
+	~15%
+	~70%
+	________________
+
+
+1. סקירת הארכיטקטורה
+1.1 עקרון היסוד: Hybrid AI
+Gen3.5 מבוססת על עיקרון של Hybrid AI - שילוב של שני עולמות:
+1. מודל Foundation (MOMENT): "עיניים" שרואות את הסיגנל ומחלצות פיצ'רים עשירים
+2. מנוע חוקים רפואיים (Rule-Based): "מוח" שמיישם את הידע הרפואי מנייר העמדה הישראלי
+היתרון: MOMENT מביא יכולת לזהות דפוסים מורכבים שקשה לקודד כחוקים, בעוד המנוע הרפואי מבטיח שכל החלטה ניתנת להסבר ועומדת בסטנדרטים הקליניים.
+1.2 תרשים זרימה של המערכת
+שלב 1: קלט
+נתוני CTG גולמיים מהמוניטור (FHR + UC בתדירות 4Hz)
+שלב 2: עיבוד מקדים (Preprocessing)
+ניקוי אותות, מילוי פערים (כלל 10 שניות), סינון Median
+שלב 3: חילוץ פיצ'רים כפול (Dual Feature Extraction)
+* ענף A - MOMENT: הפקת Embeddings (וקטורים בני 1024 מימדים)
+* ענף B - Rule-Based: חישוב Baseline, Variability, זיהוי וסיווג האטות, Tachysystole
+שלב 4: מיזוג ומסווג (Fusion + Classifier)
+שילוב הפיצ'רים משני הענפים → MLP/XGBoost → Category 1/2/3
+שלב 5: מנוע התראות והסברים (Alert Engine)
+יצירת התראה מוסברת במונחים רפואיים
+שלב 6: ממשק משתמש (Dashboard)
+הצגת כל היולדות ממוינות לפי סיכון + גרף CTG + הסברים
+1.3 רכיבי המערכת
+רכיב
+	תפקיד
+	טכנולוגיה
+	DataLoader
+	קריאת קבצי CTU-UHB מפורמט PhysioNet
+	Python + wfdb
+	Preprocessor
+	ניקוי, מילוי פערים, סינון
+	NumPy + SciPy
+	MOMENT Encoder
+	חילוץ Embeddings מהסיגנל
+	momentfm (HuggingFace)
+	Rule Engine
+	חישוב מדדים רפואיים וזיהוי האטות
+	Python (custom)
+	Classifier
+	סיווג לקטגוריה 1/2/3
+	XGBoost / PyTorch MLP
+	Alert Engine
+	יצירת הסברים בשפה רפואית
+	Python (template-based)
+	Dashboard
+	ממשק משתמש לרופאים
+	Streamlit / FastAPI+React
+	________________
+
+
+2. מפרט הנתונים
+2.1 מאגר הנתונים: CTU-UHB
+בניגוד ל-Gen4 שדרש 4 מאגרים, Gen3.5 מתבססת על מאגר יחיד - CTU-UHB Intrapartum CTG Database מ-PhysioNet.
+פרמטר
+	ערך
+	מקור
+	PhysioNet (physionet.org/content/ctu-uhb-ctgdb)
+	היקף
+	552 הקלטות לידה אמיתיות
+	ערוצים
+	FHR (דופק עוברי) + UC (צירים)
+	תדירות דגימה
+	4 Hz (4 דגימות בשנייה)
+	פורמט
+	קבצי .dat (בינארי) + .hea (כותרת)
+	Ground Truth
+	ערכי pH בדם חבל הטבור לאחר הלידה
+	הגדרת חמצת
+	pH < 7.15
+	שיעור חמצת במאגר
+	כ-8% (~44 מקרים)
+	2.2 קריאת הנתונים - קוד מלא
+שימוש בספריית wfdb לקריאת פורמט PhysioNet:
+import wfdb
+import numpy as np
+import pandas as pd
+
+
+def load_ctg_record(record_path: str) -> dict:
+    """
+    טוען הקלטת CTG בודדת מפורמט PhysioNet.
+    
+    Args:
+        record_path: נתיב לקובץ (ללא סיומת)
+        למשל: 'data/ctu-uhb-ctgdb/1001'
+    
+    Returns:
+        dict עם מפתחות: 'fhr', 'uc', 'fs', 'pH'
+    """
+    # קריאת ההקלטה
+    record = wfdb.rdrecord(record_path)
+    
+    # חילוץ הערוצים
+    fhr = record.p_signal[:, 0]  # ערוץ 0: דופק עוברי
+    uc = record.p_signal[:, 1]   # ערוץ 1: צירים
+    fs = record.fs              # תדירות דגימה (4 Hz)
+    
+    # קריאת ה-pH מקובץ הכותרת (אם קיים)
+    header = wfdb.rdheader(record_path)
+    pH = None
+    for comment in header.comments:
+        if 'pH' in comment:
+            pH = float(comment.split('=')[1].strip())
+    
+    return {
+        'fhr': fhr,
+        'uc': uc,
+        'fs': fs,
+        'pH': pH,
+        'acidosis': pH < 7.15 if pH else None
+    }
+2.3 טעינת כל המאגר
+import os
+from pathlib import Path
+
+
+def load_full_database(data_dir: str) -> pd.DataFrame:
+    """
+    טוען את כל מאגר CTU-UHB.
+    
+    Args:
+        data_dir: תיקיית הנתונים
+    
+    Returns:
+        DataFrame עם כל ההקלטות
+    """
+    records = []
+    data_path = Path(data_dir)
+    
+    # מציאת כל קבצי ה-.hea (כותרות)
+    hea_files = list(data_path.glob('*.hea'))
+    
+    for hea_file in hea_files:
+        record_name = hea_file.stem  # למשל: '1001'
+        record_path = str(data_path / record_name)
+        
+        try:
+            data = load_ctg_record(record_path)
+            data['record_id'] = record_name
+            records.append(data)
+        except Exception as e:
+            print(f'Error loading {record_name}: {e}')
+    
+    return pd.DataFrame(records)
+________________
+
+
+3. עיבוד מקדים (Preprocessing)
+שלב זה קריטי! אובדן אות ממוצע של 17.89% בערוץ הדופק. עיבוד מקדים לקוי יוביל לתוצאות שגויות.
+3.1 הסרת ערכים לא פיזיולוגיים
+כל ערך FHR מחוץ לטווח 50-240 bpm הוא רעש ויש לסמנו כחסר:
+def remove_invalid_values(fhr: np.ndarray) -> np.ndarray:
+    """
+    מסיר ערכים מחוץ לטווח הפיזיולוגי.
+    
+    Args:
+        fhr: מערך דופק עוברי
+    
+    Returns:
+        מערך עם NaN במקום ערכים לא תקינים
+    """
+    fhr = fhr.copy().astype(float)
+    
+    # סימון ערכים מחוץ לטווח
+    invalid_mask = (fhr < 50) | (fhr > 240)
+    fhr[invalid_mask] = np.nan
+    
+    return fhr
+3.2 הסרת קפיצות (Spike Removal)
+שינוי של יותר מ-30 bpm בין דגימות עוקבות אינו פיזיולוגי:
+def remove_spikes(fhr: np.ndarray, max_delta: float = 30) -> np.ndarray:
+    """
+    מסיר קפיצות חדות (רעש).
+    
+    Args:
+        fhr: מערך דופק עוברי
+        max_delta: שינוי מקסימלי מותר בין דגימות (ברירת מחדל: 30 bpm)
+    
+    Returns:
+        מערך מנוקה מקפיצות
+    """
+    fhr = fhr.copy()
+    
+    # חישוב ההפרשים בין דגימות עוקבות
+    diff = np.abs(np.diff(fhr))
+    
+    # מציאת קפיצות
+    spike_indices = np.where(diff > max_delta)[0] + 1
+    
+    # סימון כ-NaN
+    fhr[spike_indices] = np.nan
+    
+    return fhr
+3.3 מילוי פערים - כלל ה-10 שניות
+קריטי: פער קצר מ-10 שניות (40 דגימות) - מלא באינטרפולציה. פער ארוך יותר - השאר כ-NaN!
+from scipy.interpolate import CubicSpline
+
+
+def fill_gaps(fhr: np.ndarray, fs: float = 4, max_gap_sec: float = 10) -> tuple:
+    """
+    ממלא פערים קצרים באינטרפולציה.
+    
+    Args:
+        fhr: מערך דופק עוברי
+        fs: תדירות דגימה (4 Hz)
+        max_gap_sec: אורך פער מקסימלי למילוי (10 שניות)
+    
+    Returns:
+        tuple: (fhr_filled, mask)
+        - fhr_filled: מערך עם פערים קצרים ממולאים
+        - mask: מסכה בינארית (1=תקף, 0=חסר)
+    """
+    fhr = fhr.copy()
+    max_gap_samples = int(max_gap_sec * fs)  # 40 דגימות
+    
+    # מציאת אינדקסים תקפים
+    valid_indices = np.where(~np.isnan(fhr))[0]
+    
+    if len(valid_indices) < 2:
+        return fhr, np.zeros_like(fhr)
+    
+    # מציאת פערים
+    gaps = np.diff(valid_indices)
+    gap_starts = valid_indices[:-1][gaps > 1]
+    gap_lengths = gaps[gaps > 1]
+    
+    # מילוי פערים קצרים בלבד
+    for start, length in zip(gap_starts, gap_lengths):
+        if length <= max_gap_samples:
+            # אינטרפולציה Cubic Spline
+            x_valid = valid_indices
+            y_valid = fhr[valid_indices]
+            cs = CubicSpline(x_valid[~np.isnan(y_valid)], 
+                            y_valid[~np.isnan(y_valid)])
+            
+            gap_indices = np.arange(start + 1, start + length)
+            fhr[gap_indices] = cs(gap_indices)
+    
+    # יצירת מסכה
+    mask = (~np.isnan(fhr)).astype(int)
+    
+    return fhr, mask
+3.4 סינון Median
+סינון להסרת רעשים נקודתיים תוך שמירה על קצוות חדים של האטות:
+from scipy.signal import medfilt
+
+
+def apply_median_filter(fhr: np.ndarray, kernel_size: int = 5) -> np.ndarray:
+    """
+    מפעיל Median Filter.
+    
+    Args:
+        fhr: מערך דופק עוברי
+        kernel_size: גודל החלון (5 = 1.25 שניות)
+    
+    Returns:
+        מערך מסונן
+    """
+    # שמירה על NaN
+    mask = np.isnan(fhr)
+    fhr_filled = np.where(mask, 0, fhr)
+    
+    # סינון
+    fhr_filtered = medfilt(fhr_filled, kernel_size=kernel_size)
+    
+    # החזרת NaN
+    fhr_filtered[mask] = np.nan
+    
+    return fhr_filtered
+3.5 Pipeline מלא לעיבוד מקדים
+def preprocess_ctg(fhr: np.ndarray, uc: np.ndarray, fs: float = 4) -> dict:
+    """
+    Pipeline מלא לעיבוד מקדים.
+    
+    Args:
+        fhr: מערך דופק עוברי גולמי
+        uc: מערך צירים
+        fs: תדירות דגימה
+    
+    Returns:
+        dict עם נתונים מעובדים
+    """
+    # שלב 1: הסרת ערכים לא תקינים
+    fhr = remove_invalid_values(fhr)
+    
+    # שלב 2: הסרת קפיצות
+    fhr = remove_spikes(fhr)
+    
+    # שלב 3: מילוי פערים (כלל 10 שניות)
+    fhr, mask = fill_gaps(fhr, fs)
+    
+    # שלב 4: סינון Median
+    fhr = apply_median_filter(fhr)
+    
+    return {
+        'fhr': fhr,
+        'uc': uc,
+        'mask': mask,
+        'fs': fs
+    }
+________________
+
+
+4. MOMENT - מודל Foundation לסדרות עתיות
+4.1 מהו MOMENT?
+MOMENT (Multi-task Originator for Multivariate Time-series) הוא מודל Transformer שאומן על מיליוני סדרות עתיות מתחומים מגוונים. הוא יודע לזהות דפוסים כלליים כמו:
+* אנומליות (Anomalies) - שינויים חריגים
+* מגמות (Trends) - עליות/ירידות הדרגתיות
+* מחזוריות (Periodicity) - דפוסים חוזרים
+* שינויי שונות (Variance Changes) - שינוי ב"רעש"
+4.2 למה Zero-Shot?
+היתרון המרכזי של Gen3.5: אנחנו משתמשים ב-MOMENT ללא Fine-tuning!
+זה אפשרי מכיוון ש:
+3. MOMENT כבר יודע מהי האטה - הוא ראה מיליוני דפוסי ירידה בסדרות עתיות
+4. MOMENT יודע מהי שונות - הוא למד לזהות שינויים ברמת הרעש
+5. אנחנו לא צריכים שהוא יסווג בעצמו - הוא רק מחלץ פיצ'רים, והמסווג נפרד
+4.3 מפרט טכני
+פרמטר
+	ערך
+	שם המודל
+	AutonLab/MOMENT-1-large
+	מספר פרמטרים
+	385 מיליון
+	גודל Embedding
+	1024 מימדים
+	גודל Patch
+	64 דגימות (16 שניות ב-4Hz)
+	אורך קלט מקסימלי
+	512 patches = 8,192 דגימות (~34 דקות)
+	דרישות זיכרון
+	~2GB VRAM (ללא Fine-tuning)
+	זמן Inference
+	~100-200ms לחלון של 10 דקות על CPU
+	4.4 קוד - טעינת MOMENT והפקת Embeddings
+# התקנה (פעם אחת)
+# !pip install momentfm torch
+
+
+import torch
+from momentfm import MOMENTPipeline
+
+
+class MomentFeatureExtractor:
+    """
+    מחלץ פיצ'רים באמצעות MOMENT.
+    """
+    
+    def __init__(self, device: str = 'cpu'):
+        """
+        טוען את מודל MOMENT.
+        
+        Args:
+            device: 'cpu' או 'cuda'
+        """
+        self.device = device
+        
+        # טעינת המודל (ללא Fine-tuning - רק embedding)
+        self.model = MOMENTPipeline.from_pretrained(
+            'AutonLab/MOMENT-1-large',
+            model_kwargs={
+                'task_name': 'embedding',  # רק Embedding!
+                'n_channels': 1
+            }
+        )
+        self.model.to(device)
+        self.model.eval()  # מצב inference
+    
+    def extract(self, fhr: np.ndarray, window_size: int = 2400) -> np.ndarray:
+        """
+        מחלץ Embedding מחלון CTG.
+        
+        Args:
+            fhr: מערך דופק עוברי מעובד
+            window_size: גודל חלון (2400 = 10 דקות ב-4Hz)
+        
+        Returns:
+            וקטור Embedding בן 1024 מימדים
+        """
+        # בדיקת אורך
+        if len(fhr) < window_size:
+            # Padding אם קצר מדי
+            fhr = np.pad(fhr, (0, window_size - len(fhr)), mode='constant')
+        elif len(fhr) > window_size:
+            # חיתוך אם ארוך מדי
+            fhr = fhr[:window_size]
+        
+        # החלפת NaN באפסים (MOMENT לא אוהב NaN)
+        fhr = np.nan_to_num(fhr, nan=0.0)
+        
+        # נרמול
+        fhr = (fhr - np.mean(fhr)) / (np.std(fhr) + 1e-8)
+        
+        # המרה ל-Tensor
+        x = torch.tensor(fhr, dtype=torch.float32)
+        x = x.unsqueeze(0).unsqueeze(0)  # [1, 1, seq_len]
+        x = x.to(self.device)
+        
+        # Inference
+        with torch.no_grad():
+            output = self.model(x)
+            embedding = output.embeddings  # [1, 1024]
+        
+        return embedding.cpu().numpy().flatten()
+4.5 Sliding Window - עיבוד לידה שלמה
+לידה יכולה להימשך שעות. אנחנו מעבדים אותה בחלונות של 10 דקות עם חפיפה:
+def extract_embeddings_sliding_window(
+    fhr: np.ndarray,
+    extractor: MomentFeatureExtractor,
+    window_size: int = 2400,  # 10 דקות
+    step_size: int = 240      # 1 דקה
+) -> list:
+    """
+    מחלץ Embeddings בחלון נע על פני כל ההקלטה.
+    
+    Args:
+        fhr: מערך דופק עוברי
+        extractor: מופע של MomentFeatureExtractor
+        window_size: גודל חלון (10 דקות)
+        step_size: גודל צעד (1 דקה)
+    
+    Returns:
+        רשימה של Embeddings
+    """
+    embeddings = []
+    n_samples = len(fhr)
+    
+    for start in range(0, n_samples - window_size + 1, step_size):
+        end = start + window_size
+        window = fhr[start:end]
+        
+        embedding = extractor.extract(window)
+        embeddings.append({
+            'start': start,
+            'end': end,
+            'embedding': embedding
+        })
+    
+    return embeddings
+________________
+
+
+5. מנוע החוקים הרפואיים (Rule-Based Engine)
+זהו הלב של Gen3.5 - מנוע דטרמיניסטי המיישם את הקריטריונים מנייר העמדה הישראלי. הוא מבטיח שכל החלטה ניתנת להסבר ועומדת בסטנדרטים הקליניים.
+5.1 חישוב Baseline (קצב בסיסי)
+def calculate_baseline(
+    fhr: np.ndarray,
+    fs: float = 4,
+    window_min: int = 2,  # דקות מינימום למקטע יציב
+    variability_threshold: float = 25  # סף שונות למקטע יציב
+) -> float:
+    """
+    מחשב את קצב הלב הבסיסי לפי נייר העמדה.
+    
+    הגדרה: ממוצע במקטע יציב (ללא האצות/האטות, 
+           שונות < 25) של לפחות 2 דקות.
+    
+    Returns:
+        קצב בסיסי מעוגל לכפולה של 5
+    """
+    window_samples = int(window_min * 60 * fs)  # 480 דגימות
+    
+    # חיפוש מקטע יציב
+    best_baseline = None
+    min_variability = float('inf')
+    
+    for start in range(0, len(fhr) - window_samples, int(fs * 10)):
+        segment = fhr[start:start + window_samples]
+        
+        # סינון NaN
+        segment = segment[~np.isnan(segment)]
+        if len(segment) < window_samples * 0.8:
+            continue
+        
+        # חישוב שונות (max - min)
+        variability = np.max(segment) - np.min(segment)
+        
+        # בדיקה שזה מקטע יציב
+        if variability < variability_threshold:
+            if variability < min_variability:
+                min_variability = variability
+                best_baseline = np.mean(segment)
+    
+    # עיגול לכפולה של 5
+    if best_baseline is not None:
+        return round(best_baseline / 5) * 5
+    else:
+        # Fallback: ממוצע כללי
+        return round(np.nanmean(fhr) / 5) * 5
+5.2 חישוב Variability (שונות)
+def calculate_variability(
+    fhr: np.ndarray,
+    fs: float = 4,
+    window_sec: float = 60  # חלון של דקה
+) -> dict:
+    """
+    מחשב את השונות (Variability) לפי נייר העמדה.
+    
+    הגדרה: משרעת התנודות (max - min) בחלון של דקה.
+    
+    סיווג:
+        Absent:   0-2 bpm
+        Minimal:  3-5 bpm (סף 6 הוא תחילת תקין!)
+        Moderate: 6-25 bpm (תקין)
+        Marked:   > 25 bpm
+    
+    Returns:
+        dict עם 'value' ו-'category'
+    """
+    window_samples = int(window_sec * fs)
+    
+    # חישוב שונות לכל חלון
+    variabilities = []
+    for start in range(0, len(fhr) - window_samples, window_samples // 2):
+        segment = fhr[start:start + window_samples]
+        segment = segment[~np.isnan(segment)]
+        
+        if len(segment) > window_samples * 0.5:
+            var = np.max(segment) - np.min(segment)
+            variabilities.append(var)
+    
+    if not variabilities:
+        return {'value': None, 'category': 'Unknown'}
+    
+    # ממוצע השונות
+    avg_variability = np.mean(variabilities)
+    
+    # סיווג
+    if avg_variability <= 2:
+        category = 'Absent'
+    elif avg_variability <= 5:
+        category = 'Minimal'
+    elif avg_variability <= 25:
+        category = 'Moderate'  # תקין!
+    else:
+        category = 'Marked'
+    
+    return {
+        'value': round(avg_variability, 1),
+        'category': category
+    }
+________________
+
+
+5.3 זיהוי וסיווג האטות - האלגוריתם המלא
+זהו הרכיב הקריטי ביותר במערכת!
+from dataclasses import dataclass
+from typing import List, Optional
+from enum import Enum
+
+
+class DecelerationType(Enum):
+    EARLY = 'Early'
+    LATE = 'Late'
+    VARIABLE = 'Variable'
+    PROLONGED = 'Prolonged'
+    UNCLASSIFIED = 'Unclassified'
+
+
+@dataclass
+class Deceleration:
+    """מייצג האטה בודדת."""
+    start_idx: int
+    end_idx: int
+    nadir_idx: int        # נקודת המינימום
+    depth: float          # עומק ההאטה (bpm)
+    duration_sec: float   # משך בשניות
+    decel_type: DecelerationType
+    lag_sec: float        # פער מציר (לסיווג Early/Late)
+    has_severity_signs: bool  # סימני חומרה
+
+
+
+
+def detect_decelerations(
+    fhr: np.ndarray,
+    uc: np.ndarray,
+    baseline: float,
+    fs: float = 4
+) -> List[Deceleration]:
+    """
+    מזהה ומסווג האטות בסיגנל.
+    
+    הגדרת האטה (לפי נייר העמדה):
+        - ירידה של >= 15 bpm מהבסיס
+        - משך 15 שניות - 10 דקות
+    
+    סיווג לפי Lag (פער מציר):
+        Early:    Lag < 5 שניות
+        Late:     Lag > 15 שניות
+        Variable: ירידה חדה, עיתוי משתנה
+    """
+    decelerations = []
+    min_depth = 15  # bpm
+    min_duration = 15  # שניות
+    max_duration = 600  # שניות (10 דקות)
+    
+    # מציאת נקודות מתחת לסף
+    threshold = baseline - min_depth
+    below_threshold = fhr < threshold
+    
+    # מציאת תחילות וסופים של האטות
+    changes = np.diff(below_threshold.astype(int))
+    starts = np.where(changes == 1)[0] + 1
+    ends = np.where(changes == -1)[0] + 1
+    
+    # התאמת אורכי הרשימות
+    if len(starts) == 0:
+        return []
+    if len(ends) == 0 or ends[0] < starts[0]:
+        ends = np.append(ends, len(fhr))
+    if len(starts) > len(ends):
+        ends = np.append(ends, len(fhr))
+    
+    # עיבוד כל האטה
+    for start, end in zip(starts, ends):
+        duration_sec = (end - start) / fs
+        
+        # סינון לפי משך
+        if duration_sec < min_duration or duration_sec > max_duration:
+            continue
+        
+        # מציאת נקודת מינימום (Nadir)
+        segment = fhr[start:end]
+        nadir_local = np.nanargmin(segment)
+        nadir_idx = start + nadir_local
+        depth = baseline - fhr[nadir_idx]
+        
+        # סיווג האטה
+        decel_type, lag = classify_deceleration(
+            fhr, uc, nadir_idx, start, end, fs
+        )
+        
+        # בדיקת סימני חומרה
+        severity = check_severity_signs(
+            fhr, start, end, nadir_idx, baseline, fs
+        )
+        
+        decelerations.append(Deceleration(
+            start_idx=start,
+            end_idx=end,
+            nadir_idx=nadir_idx,
+            depth=depth,
+            duration_sec=duration_sec,
+            decel_type=decel_type,
+            lag_sec=lag,
+            has_severity_signs=severity
+        ))
+    
+    return decelerations
+________________
+
+
+5.3.1 סיווג סוג האטה (Early/Late/Variable)
+def classify_deceleration(
+    fhr: np.ndarray,
+    uc: np.ndarray,
+    nadir_idx: int,
+    decel_start: int,
+    decel_end: int,
+    fs: float = 4
+) -> tuple:
+    """
+    מסווג האטה לפי הקשר לציר.
+    
+    אלגוריתם:
+    1. מצא שיא הציר הקרוב ביותר
+    2. חשב Lag = זמן(nadir) - זמן(שיא ציר)
+    3. סווג לפי הטבלה:
+        Lag < 5 sec  → Early (סימטרי, עם הציר)
+        Lag > 15 sec → Late (מתחיל אחרי הציר)
+        אחר + ירידה חדה → Variable
+    
+    Returns:
+        tuple: (DecelerationType, lag_seconds)
+    """
+    # חיפוש שיא ציר בסביבת ההאטה
+    search_start = max(0, decel_start - int(120 * fs))
+    search_end = min(len(uc), decel_end + int(60 * fs))
+    uc_segment = uc[search_start:search_end]
+    
+    if len(uc_segment) == 0 or np.all(np.isnan(uc_segment)):
+        return DecelerationType.UNCLASSIFIED, 0
+    
+    # מציאת שיא הציר
+    contraction_peak_local = np.nanargmax(uc_segment)
+    contraction_peak_idx = search_start + contraction_peak_local
+    
+    # חישוב Lag בשניות
+    lag_samples = nadir_idx - contraction_peak_idx
+    lag_sec = lag_samples / fs
+    
+    # בדיקה אם זו ירידה חדה (Variable)
+    descent_rate = calculate_descent_rate(fhr, decel_start, nadir_idx, fs)
+    is_abrupt = descent_rate > 0.5  # bpm/sample
+    
+    # סיווג
+    if abs(lag_sec) < 5:
+        return DecelerationType.EARLY, lag_sec
+    elif lag_sec > 15:
+        return DecelerationType.LATE, lag_sec
+    elif is_abrupt:
+        return DecelerationType.VARIABLE, lag_sec
+    else:
+        return DecelerationType.UNCLASSIFIED, lag_sec
+
+
+
+
+def calculate_descent_rate(
+    fhr: np.ndarray,
+    start: int,
+    nadir: int,
+    fs: float
+) -> float:
+    """מחשב קצב הירידה (bpm/sample)."""
+    if nadir <= start:
+        return 0
+    
+    drop = fhr[start] - fhr[nadir]
+    samples = nadir - start
+    
+    return drop / samples if samples > 0 else 0
+5.3.2 בדיקת סימני חומרה
+def check_severity_signs(
+    fhr: np.ndarray,
+    start: int,
+    end: int,
+    nadir: int,
+    baseline: float,
+    fs: float
+) -> bool:
+    """
+    בודק סימני חומרה בהאטה משתנה.
+    
+    סימני חומרה (לפי נייר העמדה):
+    1. ירידה ל-< 70 bpm למשך > 60 שניות
+    2. היעדר שונות בתוך ההאטה
+    3. חזרה איטית לבסיס
+    4. Overshoot (עלייה מעל הבסיס בסוף)
+    5. צורת W (ביפאזית)
+    """
+    segment = fhr[start:end]
+    
+    # סימן 1: ירידה חמורה
+    severe_drop = np.sum(segment < 70) / fs > 60  # יותר מ-60 שניות מתחת ל-70
+    
+    # סימן 2: היעדר שונות בתוך ההאטה
+    internal_var = np.nanmax(segment) - np.nanmin(segment)
+    low_internal_var = internal_var < 5
+    
+    # סימן 3: חזרה איטית
+    recovery_time = (end - nadir) / fs
+    slow_recovery = recovery_time > 60  # יותר מדקה לחזור
+    
+    # סימן 4: Overshoot
+    post_decel = fhr[end:min(end + int(60*fs), len(fhr))]
+    if len(post_decel) > 0:
+        overshoot = np.nanmax(post_decel) > baseline + 10
+    else:
+        overshoot = False
+    
+    return any([severe_drop, low_internal_var, slow_recovery, overshoot])
+________________
+
+
+5.4 זיהוי Tachysystole
+def detect_tachysystole(
+    uc: np.ndarray,
+    fs: float = 4,
+    window_min: int = 30  # חלון 30 דקות
+) -> dict:
+    """
+    מזהה Tachysystole - פעילות רחמית מוגברת.
+    
+    הגדרה (נייר העמדה):
+        ממוצע > 5 צירים ב-10 דקות
+        מחושב על חלון של 30 דקות
+    
+    Returns:
+        dict עם 'detected', 'contractions_per_10min'
+    """
+    window_samples = int(window_min * 60 * fs)
+    
+    if len(uc) < window_samples:
+        return {'detected': False, 'contractions_per_10min': None}
+    
+    # לקיחת 30 הדקות האחרונות
+    uc_window = uc[-window_samples:]
+    
+    # זיהוי צירים (פיקים ב-UC)
+    from scipy.signal import find_peaks
+    
+    # נרמול
+    uc_clean = uc_window[~np.isnan(uc_window)]
+    if len(uc_clean) == 0:
+        return {'detected': False, 'contractions_per_10min': None}
+    
+    threshold = np.percentile(uc_clean, 75)
+    peaks, _ = find_peaks(uc_window, height=threshold, distance=int(60*fs))
+    
+    # חישוב ממוצע צירים ל-10 דקות
+    total_contractions = len(peaks)
+    contractions_per_10min = total_contractions / 3  # 30 דקות / 3 = ל-10 דקות
+    
+    return {
+        'detected': contractions_per_10min > 5,
+        'contractions_per_10min': round(contractions_per_10min, 1)
+    }
+5.5 זיהוי תבנית סינוסואידלית
+def detect_sinusoidal_pattern(
+    fhr: np.ndarray,
+    fs: float = 4,
+    min_duration_min: int = 20
+) -> dict:
+    """
+    מזהה תבנית סינוסואידלית - סימן חמור!
+    
+    מאפיינים (נייר העמדה):
+    - תנודות גליות חלקות
+    - תדירות: 3-5 מחזורים/דקה
+    - משרעת: 5-15 bpm
+    - משך: > 20 דקות
+    
+    Returns:
+        dict עם 'detected', 'confidence'
+    """
+    min_samples = int(min_duration_min * 60 * fs)
+    
+    if len(fhr) < min_samples:
+        return {'detected': False, 'confidence': 0}
+    
+    # ניתוח תדרים (FFT)
+    from scipy.fft import fft, fftfreq
+    
+    # קח את 20 הדקות האחרונות
+    segment = fhr[-min_samples:]
+    segment = np.nan_to_num(segment, nan=np.nanmean(segment))
+    
+    # FFT
+    n = len(segment)
+    yf = np.abs(fft(segment - np.mean(segment)))
+    xf = fftfreq(n, 1/fs)
+    
+    # חיפוש פיק בטווח 0.05-0.083 Hz (3-5 מחזורים/דקה)
+    target_freq_min = 3 / 60  # 0.05 Hz
+    target_freq_max = 5 / 60  # 0.083 Hz
+    
+    mask = (xf > target_freq_min) & (xf < target_freq_max)
+    if not np.any(mask):
+        return {'detected': False, 'confidence': 0}
+    
+    peak_power = np.max(yf[mask])
+    total_power = np.sum(yf[xf > 0])
+    
+    # בדיקת דומיננטיות הפיק
+    dominance = peak_power / total_power if total_power > 0 else 0
+    
+    # בדיקת משרעת
+    amplitude = np.max(segment) - np.min(segment)
+    amplitude_ok = 5 <= amplitude <= 15
+    
+    # החלטה
+    detected = dominance > 0.3 and amplitude_ok
+    
+    return {
+        'detected': detected,
+        'confidence': round(dominance, 2),
+        'amplitude': round(amplitude, 1)
+    }
+________________
+
+
+6. המסווג (Classifier)
+המסווג משלב את הפיצ'רים משני הענפים (MOMENT + Rule-Based) ומחליט על הקטגוריה.
+6.1 מבנה וקטור הפיצ'רים
+פיצ'ר
+	מימדים
+	מקור
+	MOMENT Embedding
+	1024
+	מודל MOMENT
+	Baseline
+	1
+	Rule Engine
+	Variability Value
+	1
+	Rule Engine
+	Variability Category (one-hot)
+	4
+	Rule Engine
+	Late Decel Count
+	1
+	Rule Engine
+	Variable Decel Count
+	1
+	Rule Engine
+	Recurrent Decels Flag
+	1
+	Rule Engine
+	Tachysystole Flag
+	1
+	Rule Engine
+	Sinusoidal Flag
+	1
+	Rule Engine
+	סה"כ
+	1035
+	
+
+	6.2 בניית וקטור הפיצ'רים
+def build_feature_vector(
+    embedding: np.ndarray,
+    baseline: float,
+    variability: dict,
+    decelerations: List[Deceleration],
+    tachysystole: dict,
+    sinusoidal: dict,
+    total_contractions: int
+) -> np.ndarray:
+    """
+    בונה וקטור פיצ'רים משולב לסיווג.
+    """
+    features = []
+    
+    # 1. MOMENT Embedding (1024)
+    features.extend(embedding)
+    
+    # 2. Baseline (1)
+    features.append(baseline / 160)  # נרמול
+    
+    # 3. Variability Value (1)
+    var_val = variability.get('value', 10) or 10
+    features.append(var_val / 25)  # נרמול
+    
+    # 4. Variability Category One-Hot (4)
+    var_cat = variability.get('category', 'Moderate')
+    categories = ['Absent', 'Minimal', 'Moderate', 'Marked']
+    one_hot = [1 if c == var_cat else 0 for c in categories]
+    features.extend(one_hot)
+    
+    # 5. Late Decel Count (1)
+    late_count = sum(1 for d in decelerations if d.decel_type == DecelerationType.LATE)
+    features.append(late_count / 10)  # נרמול
+    
+    # 6. Variable Decel Count (1)
+    var_count = sum(1 for d in decelerations if d.decel_type == DecelerationType.VARIABLE)
+    features.append(var_count / 10)
+    
+    # 7. Recurrent Decels Flag (1)
+    if total_contractions > 0:
+        decel_ratio = len(decelerations) / total_contractions
+        recurrent = 1 if decel_ratio > 0.5 else 0
+    else:
+        recurrent = 0
+    features.append(recurrent)
+    
+    # 8. Tachysystole Flag (1)
+    features.append(1 if tachysystole.get('detected', False) else 0)
+    
+    # 9. Sinusoidal Flag (1)
+    features.append(1 if sinusoidal.get('detected', False) else 0)
+    
+    return np.array(features)
+________________
+
+
+6.3 אפשרות A: מסווג XGBoost
+XGBoost הוא בחירה מצוינת כי הוא מהיר, קל לאימון, ונותן חשיבות לפיצ'רים (Explainability).
+import xgboost as xgb
+from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.metrics import classification_report, confusion_matrix
+
+
+class XGBClassifier:
+    """מסווג XGBoost לסיווג Category 1/2/3."""
+    
+    def __init__(self):
+        # משקלות למחלקות (טיפול בחוסר איזון)
+        # Category 1: שכיח, Category 3: נדיר
+        self.model = xgb.XGBClassifier(
+            objective='multi:softmax',
+            num_class=3,
+            max_depth=6,
+            learning_rate=0.1,
+            n_estimators=100,
+            scale_pos_weight=1,  # יותאם לפי הנתונים
+            use_label_encoder=False,
+            eval_metric='mlogloss'
+        )
+    
+    def train(self, X: np.ndarray, y: np.ndarray):
+        """
+        מאמן את המודל.
+        
+        Args:
+            X: מטריצת פיצ'רים [n_samples, 1035]
+            y: תוויות [0, 1, 2] עבור Category [1, 2, 3]
+        """
+        # חלוקה לאימון ובדיקה
+        X_train, X_val, y_train, y_val = train_test_split(
+            X, y, test_size=0.2, stratify=y, random_state=42
+        )
+        
+        # חישוב משקלות למחלקות
+        from sklearn.utils.class_weight import compute_sample_weight
+        sample_weights = compute_sample_weight('balanced', y_train)
+        
+        # אימון
+        self.model.fit(
+            X_train, y_train,
+            sample_weight=sample_weights,
+            eval_set=[(X_val, y_val)],
+            early_stopping_rounds=10,
+            verbose=True
+        )
+    
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """מחזיר Category (0/1/2 = 1/2/3)."""
+        return self.model.predict(X)
+    
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """מחזיר הסתברויות לכל קטגוריה."""
+        return self.model.predict_proba(X)
+    
+    def get_feature_importance(self) -> dict:
+        """מחזיר חשיבות פיצ'רים (ל-Explainability)."""
+        return dict(zip(
+            range(len(self.model.feature_importances_)),
+            self.model.feature_importances_
+        ))
+6.4 אפשרות B: MLP (רשת עצבית פשוטה)
+import torch
+import torch.nn as nn
+
+
+class MLPClassifier(nn.Module):
+    """
+    רשת MLP פשוטה לסיווג.
+    קלה יותר לשילוב עם MOMENT אם רוצים Fine-tuning עתידי.
+    """
+    
+    def __init__(self, input_dim: int = 1035, hidden_dim: int = 256):
+        super().__init__()
+        
+        self.network = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(hidden_dim // 2, 3)  # 3 קטגוריות
+        )
+    
+    def forward(self, x):
+        return self.network(x)
+    
+    def predict(self, x: np.ndarray) -> int:
+        """מחזיר Category (0/1/2)."""
+        self.eval()
+        with torch.no_grad():
+            x_tensor = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
+            logits = self.forward(x_tensor)
+            return logits.argmax(dim=1).item()
+________________
+
+
+7. לוגיקת סיווג קטגוריות (לפי נייר העמדה)
+בנוסף למסווג ה-ML, יש מנגנון Override רפואי - חוקים קשיחים שאסור להפר:
+7.1 קטגוריה 1 (תקין) - כל התנאים חייבים להתקיים
+* קצב בסיסי: 110-160 bpm
+* שונות: 6-25 bpm (Moderate)
+* אין האטות מאוחרות או משתנות
+* תיתכנה האטות מוקדמות בלבד
+7.2 קטגוריה 3 (פתולוגי) - אחד מהתנאים הבאים
+* תבנית סינוסואידלית
+* היעדר שונות (Absent) + האטות מאוחרות חוזרות
+* היעדר שונות + האטות משתנות חוזרות
+* היעדר שונות + ברדיקרדיה
+7.3 קטגוריה 2 (ביניים) - כל השאר
+כל מה שלא עונה לקטגוריה 1 או 3.
+7.4 קוד - Override Logic
+def apply_medical_override(
+    ml_prediction: int,  # 0/1/2 מהמסווג
+    variability: dict,
+    decelerations: List[Deceleration],
+    baseline: float,
+    sinusoidal: dict,
+    total_contractions: int
+) -> int:
+    """
+    מיישם חוקים רפואיים שלא ניתן להפר.
+    
+    Returns:
+        Category סופי (0/1/2 = Category 1/2/3)
+    """
+    var_cat = variability.get('category', 'Moderate')
+    
+    # בדיקת האטות חוזרות
+    late_count = sum(1 for d in decelerations 
+                    if d.decel_type == DecelerationType.LATE)
+    variable_count = sum(1 for d in decelerations 
+                        if d.decel_type == DecelerationType.VARIABLE)
+    
+    recurrent_late = (total_contractions > 0 and 
+                     late_count / total_contractions > 0.5)
+    recurrent_variable = (total_contractions > 0 and 
+                         variable_count / total_contractions > 0.5)
+    
+    # === CATEGORY 3 OVERRIDES (אי אפשר לרדת מזה) ===
+    
+    # תבנית סינוסואידלית = תמיד Category 3
+    if sinusoidal.get('detected', False):
+        return 2  # Category 3
+    
+    # היעדר שונות + האטות מאוחרות חוזרות
+    if var_cat == 'Absent' and recurrent_late:
+        return 2  # Category 3
+    
+    # היעדר שונות + האטות משתנות חוזרות
+    if var_cat == 'Absent' and recurrent_variable:
+        return 2  # Category 3
+    
+    # היעדר שונות + ברדיקרדיה
+    if var_cat == 'Absent' and baseline < 110:
+        return 2  # Category 3
+    
+    # === CATEGORY 1 CONDITIONS (צריך לעמוד בכולם) ===
+    
+    is_baseline_normal = 110 <= baseline <= 160
+    is_variability_normal = var_cat == 'Moderate'
+    no_significant_decels = late_count == 0 and variable_count == 0
+    
+    if is_baseline_normal and is_variability_normal and no_significant_decels:
+        # המסווג יכול להחליט Category 1, אבל נבדוק שאין סתירה
+        if ml_prediction == 0:
+            return 0  # Category 1
+    
+    # === ברירת מחדל - סומכים על המסווג ===
+    
+    # אבל לעולם לא מאפשרים Category 1 עם Absent variability
+    if var_cat == 'Absent' and ml_prediction == 0:
+        return 1  # לפחות Category 2
+    
+    return ml_prediction
+________________
+
+
+8. מנוע ההתראות והסברים (Alert Engine)
+כל התראה מלווה בהסבר ברור במונחים רפואיים - זה מה שהופך את המערכת לשימושית קלינית.
+8.1 מבנה ההתראה
+@dataclass
+class Alert:
+    """מייצג התראה מלאה עם הסבר."""
+    category: int                    # 1, 2, או 3
+    confidence: float                # 0-1
+    headline: str                    # כותרת קצרה
+    explanation: str                 # הסבר מפורט
+    findings: List[str]              # ממצאים שתמכו בהחלטה
+    recommendations: List[str]       # המלצות לצוות
+    timestamp: str                   # זמן ההתראה
+8.2 יצירת הסברים
+def generate_alert(
+    category: int,
+    confidence: float,
+    baseline: float,
+    variability: dict,
+    decelerations: List[Deceleration],
+    tachysystole: dict,
+    sinusoidal: dict
+) -> Alert:
+    """
+    מייצר התראה מוסברת.
+    """
+    findings = []
+    recommendations = []
+    
+    # === איסוף ממצאים ===
+    
+    # Baseline
+    if baseline < 110:
+        findings.append(f'ברדיקרדיה - קצב בסיסי {baseline} bpm')
+    elif baseline > 160:
+        findings.append(f'טכיקרדיה - קצב בסיסי {baseline} bpm')
+    else:
+        findings.append(f'קצב בסיסי תקין: {baseline} bpm')
+    
+    # Variability
+    var_val = variability.get('value', 0)
+    var_cat = variability.get('category', 'Unknown')
+    
+    if var_cat == 'Absent':
+        findings.append(f'היעדר שונות ({var_val} bpm) - ממצא חמור!')
+    elif var_cat == 'Minimal':
+        findings.append(f'שונות מזערית ({var_val} bpm) - דורש מעקב')
+    elif var_cat == 'Moderate':
+        findings.append(f'שונות תקינה ({var_val} bpm)')
+    else:
+        findings.append(f'שונות מוגברת ({var_val} bpm)')
+    
+    # Decelerations
+    late_count = sum(1 for d in decelerations 
+                    if d.decel_type == DecelerationType.LATE)
+    variable_count = sum(1 for d in decelerations 
+                        if d.decel_type == DecelerationType.VARIABLE)
+    
+    if late_count > 0:
+        findings.append(f'זוהו {late_count} האטות מאוחרות')
+    if variable_count > 0:
+        severe = sum(1 for d in decelerations 
+                    if d.decel_type == DecelerationType.VARIABLE 
+                    and d.has_severity_signs)
+        findings.append(f'זוהו {variable_count} האטות משתנות ({severe} עם סימני חומרה)')
+    
+    # Tachysystole
+    if tachysystole.get('detected', False):
+        rate = tachysystole.get('contractions_per_10min', 0)
+        findings.append(f'Tachysystole - {rate} צירים/10 דקות')
+    
+    # Sinusoidal
+    if sinusoidal.get('detected', False):
+        findings.append('זוהתה תבנית סינוסואידלית - ממצא חמור!')
+    
+    # === יצירת הסברים לפי קטגוריה ===
+    
+    if category == 3:
+        headline = 'התראה אדומה - קטגוריה 3 (פתולוגי)'
+        explanation = _build_cat3_explanation(findings, sinusoidal, variability)
+        recommendations = [
+            'הערכה מיידית של הסיבות האפשריות',
+            'שקילת החייאה תוך-רחמית',
+            'היערכות ליילוד מיידי אם אין שיפור'
+        ]
+    elif category == 2:
+        headline = 'התראה כתומה - קטגוריה 2 (ביניים)'
+        explanation = _build_cat2_explanation(findings)
+        recommendations = [
+            'המשך ניטור צמוד',
+            'שינוי תנוחת היולדת',
+            'בדיקת לחץ דם והתייבשות'
+        ]
+    else:
+        headline = 'סטטוס ירוק - קטגוריה 1 (תקין)'
+        explanation = 'כל הפרמטרים בטווח התקין.'
+        recommendations = ['המשך ניטור שגרתי']
+    
+    return Alert(
+        category=category,
+        confidence=confidence,
+        headline=headline,
+        explanation=explanation,
+        findings=findings,
+        recommendations=recommendations,
+        timestamp=datetime.now().isoformat()
+    )
+________________
+
+
+9. ממשק המשתמש (Dashboard)
+9.1 עקרונות עיצוב
+6. פשטות: הרופא צריך להבין את המצב במבט אחד
+7. מיון לפי דחיפות: Category 3 תמיד בראש הרשימה
+8. קידוד צבעים: ירוק/כתום/אדום
+9. גישה מהירה לפרטים: לחיצה על מקרה מציגה גרף + הסברים
+9.2 רכיבי הממשק
+רכיב
+	תיאור
+	רשימת יולדות
+	טבלה ממוינת לפי סיכון: שם, מיטה, קטגוריה, זמן מאז עדכון
+	גרף CTG
+	תצוגת FHR ו-UC עם סימון האטות שזוהו
+	פאנל סיכום
+	Baseline, Variability, ספירת האטות בצבעים
+	כרטיס התראה
+	הסבר מלא + ממצאים + המלצות
+	9.3 קוד - Dashboard ב-Streamlit
+import streamlit as st
+import plotly.graph_objects as go
+
+
+def render_dashboard(patients: List[dict]):
+    """
+    מרנדר את ה-Dashboard הראשי.
+    """
+    st.set_page_config(page_title='SentinelFetal', layout='wide')
+    st.title('SentinelFetal - מערכת ניטור עוברי')
+    
+    # מיון לפי סיכון
+    patients_sorted = sorted(patients, 
+                            key=lambda p: -p['alert'].category)
+    
+    # עמודה שמאלית: רשימת יולדות
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.subheader('רשימת יולדות')
+        for p in patients_sorted:
+            cat = p['alert'].category
+            color = {1: '🟢', 2: '🟠', 3: '🔴'}[cat]
+            if st.button(f"{color} {p['name']} - מיטה {p['bed']}"):
+                st.session_state.selected = p['id']
+    
+    # עמודה ימנית: פרטי המקרה הנבחר
+    with col2:
+        if 'selected' in st.session_state:
+            patient = next(p for p in patients 
+                          if p['id'] == st.session_state.selected)
+            render_patient_detail(patient)
+
+
+
+
+def render_patient_detail(patient: dict):
+    """מציג פרטי יולדת בודדת."""
+    alert = patient['alert']
+    
+    # כותרת עם צבע
+    color_map = {1: 'green', 2: 'orange', 3: 'red'}
+    st.markdown(f'<h2>{alert.headline}</h2>', unsafe_allow_html=True)
+    
+    # גרף CTG
+    fig = create_ctg_plot(patient['fhr'], patient['uc'], 
+                         patient['decelerations'])
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # פאנל ממצאים
+    st.subheader('ממצאים')
+    for finding in alert.findings:
+        st.write(f'• {finding}')
+    
+    # המלצות
+    st.subheader('המלצות')
+    for rec in alert.recommendations:
+        st.write(f'• {rec}')
+________________
+
+
+10. Pipeline מלא - מ-A עד ת
+10.1 קוד Pipeline מלא
+class SentinelFetalPipeline:
+    """
+    Pipeline מלא של Gen3.5.
+    """
+    
+    def __init__(self, classifier_path: str = None):
+        """
+        מאתחל את כל רכיבי המערכת.
+        """
+        # 1. MOMENT Feature Extractor
+        print('Loading MOMENT...')
+        self.moment = MomentFeatureExtractor(device='cpu')
+        
+        # 2. Classifier (XGBoost or MLP)
+        print('Loading Classifier...')
+        if classifier_path:
+            self.classifier = self._load_classifier(classifier_path)
+        else:
+            self.classifier = None  # צריך לאמן קודם
+    
+    def process_window(self, fhr_raw: np.ndarray, uc_raw: np.ndarray) -> Alert:
+        """
+        מעבד חלון CTG יחיד ומחזיר התראה.
+        
+        Args:
+            fhr_raw: דופק עוברי גולמי (10 דקות = 2400 דגימות)
+            uc_raw: צירים גולמיים
+        
+        Returns:
+            Alert object עם סיווג והסברים
+        """
+        # === שלב 1: Preprocessing ===
+        preprocessed = preprocess_ctg(fhr_raw, uc_raw)
+        fhr = preprocessed['fhr']
+        uc = preprocessed['uc']
+        
+        # === שלב 2: MOMENT Embedding ===
+        embedding = self.moment.extract(fhr)
+        
+        # === שלב 3: Rule-Based Features ===
+        baseline = calculate_baseline(fhr)
+        variability = calculate_variability(fhr)
+        decelerations = detect_decelerations(fhr, uc, baseline)
+        tachysystole = detect_tachysystole(uc)
+        sinusoidal = detect_sinusoidal_pattern(fhr)
+        
+        # ספירת צירים לחישוב יחס
+        from scipy.signal import find_peaks
+        peaks, _ = find_peaks(uc[~np.isnan(uc)], distance=240)
+        total_contractions = len(peaks)
+        
+        # === שלב 4: Feature Vector ===
+        features = build_feature_vector(
+            embedding, baseline, variability, 
+            decelerations, tachysystole, sinusoidal,
+            total_contractions
+        )
+        
+        # === שלב 5: Classification ===
+        if self.classifier:
+            ml_pred = self.classifier.predict(features.reshape(1, -1))[0]
+            ml_proba = self.classifier.predict_proba(features.reshape(1, -1))[0]
+            confidence = float(np.max(ml_proba))
+        else:
+            # Fallback: Rule-based only
+            ml_pred = self._rule_based_classify(
+                variability, decelerations, baseline, sinusoidal
+            )
+            confidence = 0.7
+        
+        # === שלב 6: Medical Override ===
+        final_category = apply_medical_override(
+            ml_pred, variability, decelerations, 
+            baseline, sinusoidal, total_contractions
+        )
+        
+        # === שלב 7: Generate Alert ===
+        alert = generate_alert(
+            category=final_category + 1,  # המרה ל-1/2/3
+            confidence=confidence,
+            baseline=baseline,
+            variability=variability,
+            decelerations=decelerations,
+            tachysystole=tachysystole,
+            sinusoidal=sinusoidal
+        )
+        
+        return alert
+________________
+
+
+11. אימון המסווג
+11.1 הכנת נתוני אימון
+def prepare_training_data(data_dir: str) -> tuple:
+    """
+    מכין נתונים לאימון המסווג.
+    
+    Returns:
+        tuple: (X, y) - פיצ'רים ותוויות
+    """
+    # טעינת MOMENT
+    moment = MomentFeatureExtractor(device='cuda' if torch.cuda.is_available() else 'cpu')
+    
+    # טעינת כל ההקלטות
+    database = load_full_database(data_dir)
+    
+    X_list = []
+    y_list = []
+    
+    for idx, row in database.iterrows():
+        print(f'Processing {row["record_id"]}...')
+        
+        fhr = row['fhr']
+        uc = row['uc']
+        pH = row['pH']
+        
+        # Preprocessing
+        preprocessed = preprocess_ctg(fhr, uc)
+        fhr_clean = preprocessed['fhr']
+        uc_clean = preprocessed['uc']
+        
+        # חלוקה לחלונות של 10 דקות
+        window_size = 2400
+        step_size = 600  # חפיפה של 75%
+        
+        for start in range(0, len(fhr_clean) - window_size, step_size):
+            window_fhr = fhr_clean[start:start + window_size]
+            window_uc = uc_clean[start:start + window_size]
+            
+            # דילוג על חלונות עם יותר מדי NaN
+            if np.sum(np.isnan(window_fhr)) / window_size > 0.3:
+                continue
+            
+            # חילוץ פיצ'רים
+            embedding = moment.extract(window_fhr)
+            baseline = calculate_baseline(window_fhr)
+            variability = calculate_variability(window_fhr)
+            decelerations = detect_decelerations(window_fhr, window_uc, baseline)
+            tachysystole = detect_tachysystole(window_uc)
+            sinusoidal = detect_sinusoidal_pattern(window_fhr)
+            
+            peaks, _ = find_peaks(window_uc[~np.isnan(window_uc)], distance=240)
+            total_contractions = len(peaks)
+            
+            features = build_feature_vector(
+                embedding, baseline, variability,
+                decelerations, tachysystole, sinusoidal,
+                total_contractions
+            )
+            
+            # תווית: pH → Category
+            if pH < 7.15:
+                label = 2  # Category 3 (Acidosis)
+            elif pH < 7.20:
+                label = 1  # Category 2
+            else:
+                label = 0  # Category 1
+            
+            X_list.append(features)
+            y_list.append(label)
+    
+    return np.array(X_list), np.array(y_list)
+11.2 אימון המסווג
+def train_classifier(X: np.ndarray, y: np.ndarray, output_path: str):
+    """
+    מאמן ושומר את המסווג.
+    """
+    print(f'Training on {len(X)} samples...')
+    print(f'Class distribution: {np.bincount(y)}')
+    
+    # יצירת המסווג
+    classifier = XGBClassifier()
+    
+    # אימון עם Cross-Validation
+    from sklearn.model_selection import StratifiedKFold
+    
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    scores = []
+    
+    for fold, (train_idx, val_idx) in enumerate(skf.split(X, y)):
+        print(f'Fold {fold + 1}/5...')
+        
+        X_train, X_val = X[train_idx], X[val_idx]
+        y_train, y_val = y[train_idx], y[val_idx]
+        
+        classifier.train(X_train, y_train)
+        
+        # הערכה
+        y_pred = classifier.predict(X_val)
+        accuracy = np.mean(y_pred == y_val)
+        scores.append(accuracy)
+        print(f'Fold {fold + 1} Accuracy: {accuracy:.3f}')
+    
+    print(f'Mean Accuracy: {np.mean(scores):.3f} (+/- {np.std(scores):.3f})')
+    
+    # אימון סופי על כל הנתונים
+    classifier.train(X, y)
+    
+    # שמירה
+    import joblib
+    joblib.dump(classifier.model, output_path)
+    print(f'Model saved to {output_path}')
+________________
+
+
+12. לוח זמנים ליישום
+שבוע
+	שלב
+	משימות
+	תוצר
+	1
+	Data Pipeline
+	• טעינת CTU-UHB• Preprocessing• בדיקות יחידה
+	מודולים: loader.py, preprocess.py
+	2
+	Rule Engine
+	• Baseline• Variability• זיהוי האטות• Tachysystole
+	מודול: rule_engine.py
+	3
+	MOMENT + Classifier
+	• אינטגרציית MOMENT• חילוץ Embeddings• אימון XGBoost
+	מודול: moment_encoder.py, classifier.py
+	4
+	Alert Engine + Dashboard
+	• מנוע הסברים• ממשק Streamlit• בדיקות אינטגרציה
+	אפליקציה עובדת
+	12.1 סיכונים ומיטיגציה
+סיכון
+	השפעה
+	מיטיגציה
+	MOMENT איטי על CPU
+	Dashboard לא מגיב
+	Caching + Batch processing
+	מעט נתוני Acidosis
+	Overfitting על Category 3
+	Class weights + Cross-validation
+	באגים ב-Rule Engine
+	סיווג שגוי
+	Unit tests מקיפים + ולידציה רפואית
+	________________
+
+
+נספח: התקנת סביבת הפיתוח
+# requirements.txt
+
+
+# Core
+numpy>=1.21.0
+pandas>=1.3.0
+scipy>=1.7.0
+
+
+# Data Loading
+wfdb>=4.0.0
+
+
+# MOMENT
+momentfm>=0.1.0
+torch>=2.0.0
+
+
+# Classifier
+xgboost>=1.7.0
+scikit-learn>=1.0.0
+
+
+# Dashboard
+streamlit>=1.20.0
+plotly>=5.0.0
+
+
+# Utils
+joblib>=1.1.0
+התקנה ב-Colab:
+# התקנה ב-Google Colab
+!pip install wfdb momentfm torch xgboost scikit-learn
+
+
+# הורדת מאגר CTU-UHB
+!wget -r -np -nH --cut-dirs=4 https://physionet.org/files/ctu-uhb-ctgdb/1.0.0/
+סוף המסמך | SentinelFetal Gen3.5 | גרסה 1.0 | ינואר 2026
+ /

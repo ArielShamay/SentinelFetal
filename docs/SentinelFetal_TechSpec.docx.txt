@@ -1,0 +1,339 @@
+﻿SentinelFetal Gen3.5 - Technical Specification
+
+
+
+
+SentinelFetal Gen3.5
+Technical Specification
+מפרט טכני מלא
+הגשר הפרגמטי: שילוב מודלי יסוד עם מנוע חוקים רפואיים
+גרסה 1.0 | ינואר 2026
+צוות SentinelFetal - אוניברסיטת אריאל
+אברהם אביטן | צהר לארי | יובל דידי | אריאל שמאי
+________________
+
+
+1. סקירת ארכיטקטורה
+1.1 עקרון היסוד: Hybrid AI
+Gen3.5 מבוססת על עיקרון של Hybrid AI - שילוב של שני עולמות:
+* מודל Foundation (MOMENT): "עיניים" שרואות את הסיגנל ומחלצות פיצ'רים עשירים
+* מנוע חוקים רפואיים (Rule-Based): "מוח" שמיישם את הידע הרפואי מנייר העמדה הישראלי
+היתרון: MOMENT מביא יכולת לזהות דפוסים מורכבים, בעוד המנוע הרפואי מבטיח שכל החלטה ניתנת להסבר.
+1.2 רכיבי המערכת
+רכיב
+	תפקיד
+	טכנולוגיה
+	DataLoader
+	קריאת קבצי CTU-UHB
+	Python + wfdb
+	Preprocessor
+	ניקוי, מילוי פערים, סינון
+	NumPy + SciPy
+	MOMENT Encoder
+	חילוץ Embeddings
+	momentfm (HuggingFace)
+	Rule Engine
+	חישוב מדדים רפואיים
+	Python (custom)
+	Classifier
+	סיווג לקטגוריה 1/2/3
+	XGBoost / PyTorch MLP
+	Alert Engine
+	יצירת הסברים רפואיים
+	Python (template-based)
+	Dashboard
+	ממשק משתמש
+	Streamlit / FastAPI+React
+	________________
+
+
+2. מפרט הנתונים
+2.1 מאגר CTU-UHB
+פרמטר
+	ערך
+	מקור
+	physionet.org/content/ctu-uhb-ctgdb
+	היקף
+	552 הקלטות לידה
+	ערוצים
+	FHR (דופק עוברי) + UC (צירים)
+	תדירות דגימה
+	4 Hz
+	פורמט
+	.dat (בינארי) + .hea (כותרת)
+	Ground Truth
+	pH בדם חבל הטבור
+	הגדרת חמצת
+	pH < 7.15
+	שיעור חמצת
+	~8% (~44 מקרים)
+	________________
+
+
+3. עיבוד מקדים (Preprocessing)
+שלב קריטי! אובדן אות ממוצע של 17.89%. עיבוד לקוי = תוצאות שגויות.
+3.1 הסרת ערכים לא פיזיולוגיים
+* טווח תקין: 50-240 bpm
+* ערכים מחוץ לטווח → NaN
+3.2 הסרת קפיצות
+* סף שינוי מקסימלי: 30 bpm בין דגימות
+* קפיצות → NaN
+3.3 כלל ה-10 שניות
+קריטי:
+* פער < 10 שניות (40 דגימות) → מילוי ב-Cubic Spline
+* פער >= 10 שניות → השארה כ-NaN
+3.4 סינון Median
+* גודל חלון: 5 דגימות (1.25 שניות)
+* שמירה על קצוות חדים של האטות
+________________
+
+
+4. מודל MOMENT
+4.1 מפרט טכני
+פרמטר
+	ערך
+	שם המודל
+	AutonLab/MOMENT-1-large
+	פרמטרים
+	385 מיליון
+	Embedding
+	1024 מימדים
+	Patch Size
+	64 דגימות (16 שניות)
+	קלט מקסימלי
+	512 patches (~34 דקות)
+	זיכרון
+	~2GB VRAM
+	Inference
+	100-200ms / 10 דקות (CPU)
+	
+
+4.2 Sliding Window
+* גודל חלון: 2400 דגימות (10 דקות)
+* צעד: 240 דגימות (1 דקה)
+* חפיפה: 90%
+________________
+
+
+5. מנוע החוקים הרפואיים
+לב המערכת - מנוע דטרמיניסטי לפי נייר העמדה הישראלי.
+5.1 Baseline
+* הגדרה: ממוצע במקטע יציב >= 2 דקות
+* סף שונות: < 25 bpm
+* עיגול לכפולה של 5
+5.2 Variability
+קטגוריה
+	טווח (bpm)
+	משמעות
+	Absent
+	0-2
+	חמור!
+	Minimal
+	3-5
+	דורש מעקב
+	Moderate
+	6-25
+	תקין
+	Marked
+	> 25
+	מוגבר
+	
+
+5.3 האטות
+הגדרה: ירידה >= 15 bpm, משך 15 שניות - 10 דקות
+סוג
+	Lag
+	תיאור
+	Early
+	< 5 sec
+	עם הציר - תקין
+	Late
+	> 15 sec
+	אחרי הציר - חשוד
+	Variable
+	משתנה
+	ירידה חדה
+	Prolonged
+	-
+	> 2 דקות
+	
+
+5.4 סימני חומרה
+* ירידה ל-< 70 bpm למשך > 60 שניות
+* היעדר שונות בתוך ההאטה
+* חזרה איטית (> 60 שניות)
+* Overshoot
+5.5 Tachysystole
+הגדרה: > 5 צירים ב-10 דקות (על חלון 30 דקות)
+5.6 תבנית סינוסואידלית
+* תדירות: 3-5 מחזורים/דקה
+* משרעת: 5-15 bpm
+* משך: > 20 דקות
+________________
+
+
+6. המסווג
+6.1 וקטור פיצ'רים
+פיצ'ר
+	מימדים
+	מקור
+	MOMENT Embedding
+	1024
+	MOMENT
+	Baseline
+	1
+	Rule Engine
+	Variability Value
+	1
+	Rule Engine
+	Variability Category
+	4
+	Rule Engine
+	Late/Variable Counts
+	2
+	Rule Engine
+	Flags (Recurrent, Tachy, Sin)
+	3
+	Rule Engine
+	סה"כ
+	1035
+	-
+	
+
+6.2 אפשרויות
+XGBoost (מומלץ):
+* מהיר, Feature Importance, טיפול בחוסר איזון
+MLP:
+* Linear(1035→256) → ReLU → Dropout → Linear(256→128) → ReLU → Dropout → Linear(128→3)
+________________
+
+
+7. לוגיקת קטגוריות
+7.1 קטגוריה 1 (תקין)
+כל התנאים חייבים להתקיים:
+* Baseline: 110-160 bpm
+* Variability: 6-25 bpm (Moderate)
+* אין Late/Variable decels
+7.2 קטגוריה 3 (פתולוגי)
+אחד מאלה = Override מוחלט:
+* תבנית סינוסואידלית
+* Absent variability + Late decels חוזרות
+* Absent variability + Variable decels חוזרות
+* Absent variability + ברדיקרדיה
+7.3 קטגוריה 2 (ביניים)
+כל השאר.
+________________
+
+
+8. מנוע התראות
+8.1 מבנה Alert
+שדה
+	תיאור
+	category
+	1, 2, או 3
+	confidence
+	0-1
+	headline
+	כותרת קצרה
+	explanation
+	הסבר מפורט בעברית רפואית
+	findings
+	רשימת ממצאים
+	recommendations
+	המלצות לצוות
+	timestamp
+	ISO 8601
+	________________
+
+
+9. Dashboard
+9.1 עקרונות עיצוב
+* פשטות - הבנה במבט אחד
+* מיון לפי דחיפות - Category 3 בראש
+* צבעים: ירוק/כתום/אדום
+* גישה מהירה לפרטים
+9.2 רכיבים
+* רשימת יולדות (ממוינת לפי סיכון)
+* גרף CTG + סימון האטות
+* פאנל סיכום (Baseline, Variability)
+* כרטיס התראה (ממצאים + המלצות)
+________________
+
+
+10. תלויות
+חבילה
+	גרסה
+	שימוש
+	numpy
+	>= 1.21.0
+	Core
+	pandas
+	>= 1.3.0
+	Core
+	scipy
+	>= 1.7.0
+	Core
+	wfdb
+	>= 4.0.0
+	Data
+	momentfm
+	>= 0.1.0
+	MOMENT
+	torch
+	>= 2.0.0
+	MOMENT
+	xgboost
+	>= 1.7.0
+	Classifier
+	scikit-learn
+	>= 1.0.0
+	Classifier
+	streamlit
+	>= 1.20.0
+	Dashboard
+	plotly
+	>= 5.0.0
+	Dashboard
+	________________
+
+
+11. לוח זמנים
+שבוע
+	שלב
+	משימות
+	תוצר
+	1
+	Data Pipeline
+	טעינה, Preprocessing, Tests
+	loader.py, preprocess.py
+	2
+	Rule Engine
+	Baseline, Variability, Decels
+	rule_engine.py
+	3
+	MOMENT + Classifier
+	אינטגרציה, אימון XGBoost
+	moment.py, classifier.py
+	4
+	Alert + Dashboard
+	מנוע הסברים, UI
+	אפליקציה מלאה
+	
+
+11.1 סיכונים
+סיכון
+	השפעה
+	מיטיגציה
+	MOMENT איטי
+	UI לא מגיב
+	Caching + Batch
+	מעט Acidosis
+	Overfitting
+	Class weights + CV
+	באגים ב-Rules
+	סיווג שגוי
+	Unit tests + ולידציה
+	
+
+סוף המסמך | SentinelFetal Gen3.5 Technical Spec | גרסה 1.0 | ינואר 2026
+עמוד

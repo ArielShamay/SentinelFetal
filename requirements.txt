@@ -1,0 +1,26 @@
+# SentinelFetal Dependencies
+
+# Data handling
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+
+# PhysioNet data loading
+wfdb>=4.1.0
+
+# Visualization
+matplotlib>=3.7.0
+plotly>=5.14.0
+
+# Testing
+pytest>=7.3.0
+pytest-cov>=4.1.0
+
+# ML (for later phases)
+scikit-learn>=1.2.0
+# xgboost>=1.7.0
+# tensorflow>=2.12.0
+
+# Utilities
+tqdm>=4.65.0
+python-dateutil>=2.8.0
