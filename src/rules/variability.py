@@ -33,6 +33,8 @@ from typing import Optional
 
 import numpy as np
 
+from src.config import CTG, THRESHOLDS
+
 # Configure module logger
 logger = logging.getLogger(__name__)
 
@@ -70,11 +72,11 @@ class VariabilityCategory(Enum):
         Returns:
             Corresponding VariabilityCategory.
         """
-        if value <= 2:
+        if value <= THRESHOLDS.VARIABILITY_ABSENT_MAX:
             return cls.ABSENT
-        elif value <= 5:
+        elif value <= THRESHOLDS.VARIABILITY_MINIMAL_MAX:
             return cls.MINIMAL
-        elif value <= 25:
+        elif value <= THRESHOLDS.VARIABILITY_MODERATE_MAX:
             return cls.MODERATE
         else:
             return cls.MARKED

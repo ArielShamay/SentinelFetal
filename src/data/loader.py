@@ -25,6 +25,8 @@ import numpy as np
 import pandas as pd
 import wfdb
 
+from src.config import THRESHOLDS
+
 # Configure module logger
 logger = logging.getLogger(__name__)
 
@@ -408,10 +410,10 @@ class CTUDataLoader:
             # Unknown pH → assume Normal (Category 1)
             return 0
         
-        if ph < 7.15:
+        if ph < THRESHOLDS.PH_PATHOLOGICAL:
             # Pathological (Category 3)
             return 2
-        elif ph < 7.20:
+        elif ph < THRESHOLDS.PH_INTERMEDIATE:
             # Intermediate (Category 2)
             return 1
         else:

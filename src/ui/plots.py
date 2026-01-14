@@ -20,14 +20,15 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from src.rules.decelerations import Deceleration
+from src.config import CTG, COLORS
 
 
-# Color scheme following spec
-FHR_COLOR = '#1E90FF'  # Dodger Blue
-UC_COLOR = '#FF8C00'   # Dark Orange
-DECEL_COLOR = 'rgba(255, 0, 0, 0.3)'  # Red with transparency
-GRID_COLOR = '#E5E5E5'
-BACKGROUND_COLOR = '#FAFAFA'
+# Color scheme from centralized config
+FHR_COLOR = COLORS.FHR
+UC_COLOR = COLORS.UC
+DECEL_COLOR = COLORS.DECEL_HIGHLIGHT
+GRID_COLOR = COLORS.GRID
+BACKGROUND_COLOR = COLORS.BACKGROUND
 
 
 def create_ctg_plot(
