@@ -127,34 +127,57 @@ class XGBClassifierWrapper:
         self.is_trained = False
         self._feature_importance: Optional[np.ndarray] = None
     
-    def _create_model(self, class_weights: Optional[dict] = None) -> xgb.XGBClassifier:
+    def _create_model(self, class_weights: Optional[dict] = None, num_classes: int = 3) -> xgb.XGBClassifier:
         """
         Create a new XGBoost classifier instance.
         
         Args:
             class_weights: Optional class weight dictionary.
+            num_classes: Number of classes for classification.
             
         Returns:
             Configured XGBClassifier instance.
         """
-        params = {
-            'n_estimators': self.config.n_estimators,
-            'max_depth': self.config.max_depth,
-            'learning_rate': self.config.learning_rate,
-            'min_child_weight': self.config.min_child_weight,
-            'subsample': self.config.subsample,
-            'colsample_bytree': self.config.colsample_bytree,
-            'gamma': self.config.gamma,
-            'reg_alpha': self.config.reg_alpha,
-            'reg_lambda': self.config.reg_lambda,
-            'random_state': self.config.random_state,
-            'tree_method': self.config.tree_method,
-            'objective': 'multi:softprob',
-            'num_class': 3,
-            'eval_metric': 'mlogloss',
-            'use_label_encoder': False,
-            'verbosity': 0
-        }
+        # For binary classification, use different objective
+        if num_classes == 2:
+            objective = 'binary:logistic'
+            params = {
+                'n_estimators': self.config.n_estimators,
+                'max_depth': self.config.max_depth,
+                'learning_rate': self.config.learning_rate,
+                'min_child_weight': self.config.min_child_weight,
+                'subsample': self.config.subsample,
+                'colsample_bytree': self.config.colsample_bytree,
+                'gamma': self.config.gamma,
+                'reg_alpha': self.config.reg_alpha,
+                'reg_lambda': self.config.reg_lambda,
+                'random_state': self.config.random_state,
+                'tree_method': self.config.tree_method,
+                'objective': objective,
+                'eval_metric': 'logloss',
+                'use_label_encoder': False,
+                'verbosity': 0
+            }
+        else:
+            objective = 'multi:softprob'
+            params = {
+                'n_estimators': self.config.n_estimators,
+                'max_depth': self.config.max_depth,
+                'learning_rate': self.config.learning_rate,
+                'min_child_weight': self.config.min_child_weight,
+                'subsample': self.config.subsample,
+                'colsample_bytree': self.config.colsample_bytree,
+                'gamma': self.config.gamma,
+                'reg_alpha': self.config.reg_alpha,
+                'reg_lambda': self.config.reg_lambda,
+                'random_state': self.config.random_state,
+                'tree_method': self.config.tree_method,
+                'objective': objective,
+                'num_class': num_classes,
+                'eval_metric': 'mlogloss',
+                'use_label_encoder': False,
+                'verbosity': 0
+            }
         
         if self.config.scale_pos_weight is not None:
             params['scale_pos_weight'] = self.config.scale_pos_weight
@@ -214,6 +237,10 @@ class XGBClassifierWrapper:
         logger.info(f"Feature dimension: {X.shape[1]}")
         logger.info(f"Class distribution: {np.bincount(y)}")
         
+        # Determine number of classes
+        num_classes = len(np.unique(y))
+        self._num_classes = num_classes  # Store for later use
+        
         # Compute class weights if enabled
         sample_weights = None
         if self.config.use_class_weights:
@@ -222,6 +249,7 @@ class XGBClassifierWrapper:
         
         cv_scores = []
         confusion_matrices = []
+        unique_labels = np.unique(y).astype(int)
         
         if validate:
             # Stratified K-Fold cross-validation
@@ -241,7 +269,7 @@ class XGBClassifierWrapper:
                 if sample_weights is not None:
                     fold_weights = sample_weights[train_idx]
                 
-                model = self._create_model()
+                model = self._create_model(num_classes=num_classes)
                 model.fit(X_train, y_train, sample_weight=fold_weights)
                 
                 y_pred = model.predict(X_val)
@@ -250,14 +278,14 @@ class XGBClassifierWrapper:
                 f1 = f1_score(y_val, y_pred, average='macro')
                 cv_scores.append(f1)
                 
-                cm = confusion_matrix(y_val, y_pred, labels=[0, 1, 2])
+                cm = confusion_matrix(y_val, y_pred, labels=unique_labels)
                 confusion_matrices.append(cm)
                 
                 logger.info(f"  Fold {fold}: F1 = {f1:.3f}")
         
         # Train final model on all data
         logger.info("Training final model on all data...")
-        self.model = self._create_model()
+        self.model = self._create_model(num_classes=num_classes)
         self.model.fit(X, y, sample_weight=sample_weights)
         self.is_trained = True
         
@@ -266,10 +294,20 @@ class XGBClassifierWrapper:
         
         # Final predictions for confusion matrix
         y_pred_final = self.model.predict(X)
-        final_cm = confusion_matrix(y, y_pred_final, labels=[0, 1, 2])
+        y_pred_final = np.asarray(y_pred_final).ravel()  # Ensure 1D array
+        
+        # Determine labels present in data (handle demo with fewer classes)
+        unique_labels = np.unique(np.concatenate([y.ravel(), y_pred_final]))
+        unique_labels = unique_labels.astype(int)  # Ensure integer labels
+        n_classes = len(unique_labels)
+        class_names = [self.CLASS_NAMES[int(i)] if int(i) < len(self.CLASS_NAMES) else f"Class_{i}" 
+                       for i in unique_labels]
+        
+        final_cm = confusion_matrix(y, y_pred_final, labels=unique_labels)
         final_report = classification_report(
             y, y_pred_final,
-            target_names=self.CLASS_NAMES,
+            target_names=class_names,
+            labels=unique_labels,
             digits=3
         )
         
