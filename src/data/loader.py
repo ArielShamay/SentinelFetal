@@ -323,3 +323,103 @@ class CTUDataLoader:
             except DataLoaderError as e:
                 logger.warning(f"Failed to load record {record_id}: {e}")
                 continue
+
+    def extract_ph(self, record_id: str) -> Optional[float]:
+        """
+        Extract pH value from a record's .hea file comments.
+        
+        The pH value is stored in the comments section of the .hea file
+        in the format: '#pH           7.14'
+        
+        Args:
+            record_id: The record identifier (e.g., '1001').
+            
+        Returns:
+            pH value as float, or None if not found.
+            
+        Example:
+            >>> loader = CTUDataLoader("data/ctu-uhb")
+            >>> ph = loader.extract_ph("1001")
+            >>> print(f"pH: {ph}")  # pH: 7.14
+        """
+        hea_path = self.data_dir / f"{record_id}.hea"
+        
+        if not hea_path.exists():
+            logger.warning(f"Header file not found for record {record_id}")
+            return None
+        
+        try:
+            with open(hea_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('#pH'):
+                        # Parse line like '#pH           7.14'
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            try:
+                                ph_value = float(parts[1])
+                                return ph_value
+                            except ValueError:
+                                logger.warning(
+                                    f"Invalid pH value in record {record_id}: {parts[1]}"
+                                )
+                                return None
+        except Exception as e:
+            logger.warning(f"Error reading pH for record {record_id}: {e}")
+            return None
+        
+        return None
+
+    def get_outcome_label(self, record_id: str) -> int:
+        """
+        Get outcome label based on pH value per Israeli Position Paper.
+        
+        Label mapping (for 3-class classification):
+            - pH < 7.15 → Label 2 (Category 3 - Pathological)
+            - 7.15 ≤ pH < 7.20 → Label 1 (Category 2 - Intermediate)
+            - pH ≥ 7.20 (or unknown) → Label 0 (Category 1 - Normal)
+        
+        Args:
+            record_id: The record identifier.
+            
+        Returns:
+            Integer label: 0 (Normal), 1 (Intermediate), or 2 (Pathological).
+            
+        Example:
+            >>> label = loader.get_outcome_label("1001")
+            >>> print(f"Label: {label}")  # Label: 2 (pH was 7.14)
+        """
+        ph = self.extract_ph(record_id)
+        
+        if ph is None:
+            # Unknown pH → assume Normal (Category 1)
+            return 0
+        
+        if ph < 7.15:
+            # Pathological (Category 3)
+            return 2
+        elif ph < 7.20:
+            # Intermediate (Category 2)
+            return 1
+        else:
+            # Normal (Category 1)
+            return 0
+
+    def get_all_ph_values(self) -> dict[str, Optional[float]]:
+        """
+        Extract pH values for all records in the dataset.
+        
+        Returns:
+            Dictionary mapping record_id to pH value (or None if unavailable).
+            
+        Example:
+            >>> ph_values = loader.get_all_ph_values()
+            >>> known = {k: v for k, v in ph_values.items() if v is not None}
+            >>> print(f"Found pH for {len(known)} records")
+        """
+        ph_values: dict[str, Optional[float]] = {}
+        
+        for record_id in self.list_records():
+            ph_values[record_id] = self.extract_ph(record_id)
+        
+        return ph_values
