@@ -198,25 +198,18 @@ def run_full_pipeline(record: CTGRecord, use_ml: bool = True) -> Dict[str, Any]:
     results['confidence'] = confidence
     
     # Step 4: Medical Override
-    # Count contractions for override
-    from scipy.signal import find_peaks
-    uc_valid = uc_clean[~np.isnan(uc_clean)]
-    if len(uc_valid) > 0:
-        peaks, _ = find_peaks(uc_valid, distance=240, height=20)
-        total_contractions = len(peaks)
-    else:
-        total_contractions = 0
-    
-    final_category = apply_medical_override(
+    override_result = apply_medical_override(
         ml_prediction=ml_prediction,
+        baseline=baseline_result,
         variability=variability_result,
         decelerations=decelerations,
-        baseline=baseline_result,
-        sinusoidal=sinusoidal_result,
-        total_contractions=total_contractions
+        tachysystole=tachysystole_result,
+        sinusoidal=sinusoidal_result
     )
     
+    final_category = override_result.final_category  # Extract int from MedicalOverride
     results['final_category'] = final_category + 1  # Convert to 1/2/3
+    results['override_result'] = override_result  # Store full override info
     
     # Step 5: Generate Alert
     alert = generate_alert(
