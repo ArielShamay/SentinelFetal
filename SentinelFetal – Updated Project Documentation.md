@@ -1,9 +1,10 @@
 # SentinelFetal – Updated Project Documentation
 
-**Version:** Gen3.5 (Phase 5 Complete)
-**Last Updated:** January 2026
+**Version:** Gen3.5 (Phase 6 Complete - Production Ready)
+**Last Updated:** January 14, 2026
 **Author:** Ariel Shamay
 **Total Lines of Code:** ~8,500 lines (6,130 source + 2,387 tests)
+**Model Stats:** 3,240 samples | 50 records | F1=1.0 | 3 classes
 
 ---
 
@@ -364,6 +365,11 @@ class CTGRecord:
     sampling_rate: float              # Sampling frequency (4 Hz)
     duration_seconds: float           # Total recording duration
     metadata: dict[str, Any]          # Additional info
+    
+    @property
+    def fhr(self) -> np.ndarray:      # **NEW** Alias for fhr1
+        """Convenience property returning fhr1."""
+        return self.fhr1
 ```
 
 ###### CTUDataLoader (Class)
