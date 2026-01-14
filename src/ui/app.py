@@ -45,12 +45,14 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
-# Configuration
+# Configuration (imported from centralized config)
 # ============================================================================
 
-DATA_DIR = "data/ctu-chb-intrapartum-cardiotocography-database-1.0.0/ctu-chb-intrapartum-cardiotocography-database-1.0.0"
-MODEL_PATH = "models/xgb_demo.json"
-SAMPLING_RATE = 4.0
+from src.config import CTG, PATHS, COLORS
+
+DATA_DIR = PATHS.CTU_UHB_DATA_DIR
+MODEL_PATH = PATHS.DEFAULT_MODEL_PATH
+SAMPLING_RATE = CTG.SAMPLING_RATE
 
 
 # ============================================================================

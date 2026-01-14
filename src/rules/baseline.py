@@ -28,6 +28,8 @@ from typing import Optional
 
 import numpy as np
 
+from src.config import THRESHOLDS
+
 # Configure module logger
 logger = logging.getLogger(__name__)
 
@@ -160,10 +162,10 @@ def calculate_baseline(
     # Round to nearest multiple of 5
     baseline_rounded = _round_to_nearest_5(best_baseline)
     
-    # Classify baseline
-    is_normal = 110 <= baseline_rounded <= 160
-    is_bradycardia = baseline_rounded < 110
-    is_tachycardia = baseline_rounded > 160
+    # Classify baseline using config thresholds
+    is_normal = THRESHOLDS.BASELINE_NORMAL_MIN <= baseline_rounded <= THRESHOLDS.BASELINE_NORMAL_MAX
+    is_bradycardia = baseline_rounded < THRESHOLDS.BASELINE_BRADYCARDIA
+    is_tachycardia = baseline_rounded > THRESHOLDS.BASELINE_TACHYCARDIA
     
     logger.info(
         f"Baseline calculated: {baseline_rounded} bpm "
