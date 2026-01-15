@@ -26,6 +26,12 @@ SentinelFetal is a real-time fetal distress detection system for Cardiotocograph
 
 ## 2. Change Log / Summary of Updates
 
+- **Modular Architecture Refactoring (Jan 2026)**: Complete refactoring to Dependency Injection (DI) pattern using Python Protocols.
+  - **New Interfaces Module**: `src/interfaces/` defining contracts for all components (Protocol-based).
+  - **Adapters Layer**: `src/adapters/` wrapping existing logic to conform to interfaces.
+  - **Pipeline Container**: `src/pipeline/container.py` for centrally managing dependencies.
+  - **Modular Pipeline**: `src/pipeline/analysis_pipeline.py` orchestrating analysis via injected components.
+  - **Zero Logic Changes**: Core clinical and ML algorithms remain untouched, only the structure changed.
 - **Real-time simulation system**: Complete `src/simulation/` module with orchestrator, patient generators, FHR/UC signal synthesis, event injection, and ring buffer management
 - **Simulation dashboard**: New `src/ui/simulation_app.py` with 8-patient real-time monitoring
 - **Pipeline adapter**: Bridges simulation to existing Gen3.5 analysis pipeline
@@ -52,11 +58,7 @@ SentinelFetal/
 │       └── y.npy                                  # Label vector
 │
 ├── docs/                                          # Documentation
-│   ├── SentinelFetal_PRD.docx.txt                # Product requirements
-│   ├── SentinelFetal_Gen35_Spec.docx.txt         # Technical specification
-│   ├── SentinelFetal_RealTimeSimulator_PRD.md    # Simulator PRD
-│   ├── SentinelFetal_RealTimeSimulator_SPEC_Part1.md
-│   └── SentinelFetal_RealTimeSimulator_SPEC_Part2.md
+│   └── SentinelFetal – Unified Project Documentation.md  # This file
 │
 ├── models/                                        # Saved trained models
 │   ├── xgb_demo.json                             # XGBoost classifier
@@ -67,11 +69,29 @@ SentinelFetal/
 ├── scripts/                                       # Executable scripts
 │   ├── run_simulation.py                         # Launch simulation dashboard
 │   ├── visualize_preprocessing.py                # Data preprocessing visualization
+│   └── verify_system.py                          # System health verification script
 │   └── README.md                                 # Script usage notes
 │
 ├── src/                                           # Main source code
 │   ├── __init__.py
 │   ├── config.py                                 # Centralized configuration
+│   │
+│   ├── interfaces/                               # [NEW] Protocol definitions
+│   │   ├── __init__.py
+│   │   ├── protocols.py                          # Interface contracts
+│   │   └── types.py                              # Shared type definitions
+│   │
+│   ├── adapters/                                 # [NEW] Implementation wrappers
+│   │   ├── __init__.py
+│   │   ├── data_adapters.py                      # Data layer adapters
+│   │   ├── rule_adapters.py                      # Clinical rule adapters
+│   │   ├── model_adapters.py                     # ML model adapters
+│   │   └── analysis_adapters.py                  # Analysis components adapters
+│   │
+│   ├── pipeline/                                 # [NEW] Analysis orchestration
+│   │   ├── __init__.py
+│   │   ├── container.py                          # Dependency injection container
+│   │   └── analysis_pipeline.py                  # Main analysis workflow
 │   │
 │   ├── analysis/                                 # Analysis & alert generation
 │   │   ├── __init__.py
@@ -135,6 +155,7 @@ SentinelFetal/
 │
 ├── tests/                                         # Test suite
 │   ├── __init__.py
+│   ├── test_modular_pipeline.py                  # [NEW] Modular architecture tests
 │   ├── test_preprocessing.py                     # Preprocessing tests
 │   ├── test_rules.py                             # Rule engine tests
 │   ├── test_phase4.py                            # Phase 4 integration tests
@@ -155,7 +176,7 @@ SentinelFetal/
 
 ## 4. Architecture Overview
 
-### 4.1 Hybrid Pipeline Architecture
+### 4.1 Hybrid Pipeline Architecture (Conceptual)
 
 ```
 ┌─────────────┐
@@ -204,19 +225,56 @@ SentinelFetal/
          └─────────────────┘
 ```
 
-### 4.2 Layer Responsibilities
+### 4.2 Modular Software Architecture (Implementation)
+
+The system is implemented using a **Dependency Injection (DI)** pattern defined in `src/pipeline/container.py`.
+
+```
+┌───────────────────────────────────────────────┐
+│              Pipeline Container               │
+│ (Manages dependencies & life-cycle)           │
+└───────────────────────┬───────────────────────┘
+                        │ Injects
+                        v
+┌───────────────────────────────────────────────┐
+│               AnalysisPipeline                │
+│ (Orchestrates flow via Protocols)             │
+└────┬──────────────┬───────────────┬───────┬───┘
+     │              │               │       │
+     │     Uses     │     Uses      │ Uses  │
+     v              v               v       v
+┌─────────┐   ┌────────────┐   ┌────────┐ ┌──────┐
+│IPrepro- │   │IRule-      │   │IModel- │ │...   │
+│cessor   │   │Calculators │   │Adapters│ │      │
+└────▲────┘   └──────▲─────┘   └───▲────┘ └──────┘
+     │               │             │
+     │ Implements    │ Implements  │ Implements
+     │               │             │
+┌────┴────┐   ┌──────┴─────┐   ┌───┴────┐
+│Adapter  │   │Adapter     │   │Adapter │
+│(Wrapper)│   │(Wrapper)   │   │(Wrap)  │
+└────┬────┘   └──────┬─────┘   └───┬────┘
+     │ Calls         │ Calls       │ Calls
+     v               v             v
+┌─────────┐   ┌────────────┐   ┌────────┐
+│Legacy   │   │Legacy Rules│   │Legacy  │
+│Preproc  │   │(func/class)│   │Models  │
+└─────────┘   └────────────┘   └────────┘
+```
+
+### 4.3 Layer Responsibilities
 
 | Layer | Module | Purpose |
 |-------|--------|---------|
+| **Interfaces** | `interfaces/*` | **Protocol definitions** (Contracts) for all system components |
+| **Adapters** | `adapters/*` | **Wrappers** that adapt legacy logic to new Protocols |
+| **Pipeline** | `pipeline/*` | **Container** & **Orchestrator** using DI to run analysis |
 | Data | `loader.py` | Reads CTU-UHB records, returns `CTGRecord` with FHR/UC arrays |
-| Preprocessing | `preprocess.py` | Cleans signals (out-of-range → NaN, spike removal, 10s gap fill) |
-| Rule Engine | `rules/*` | Baseline, variability, decelerations, tachysystole, sinusoidal detectors |
-| Feature Extraction | `moment_encoder.py` | Produces 1024-dim embeddings (real or mock) |
-| Feature Fusion | `fusion.py` | Merges embeddings with rule features into 1035-dim vector |
-| Classification | `classifier.py` | XGBoost predicts Category 1/2/3 with cross-validation |
-| Safety Net | `override.py` | Applies hard clinical overrides to ML prediction |
-| Alerting | `alerts.py` | Generates Hebrew explanations and recommendations |
-| UI | `app.py`, `simulation_app.py` | Streamlit dashboards for visualization |
+| Preprocessing | `preprocess.py` | Implementation of signal cleaning logic |
+| Rule Engine | `rules/*` | Implementation of clinical algorithms |
+| ML Core | `models/*` | Implementation of MOMENT and XGBoost logic |
+| UI | `ui/*` | Streamlit dashboards (consumers of the pipeline) |
+
 
 ---
 
@@ -974,20 +1032,67 @@ python scripts/run_simulation.py
 
 ---
 
+### 5.10 Interfaces & Protocols (`src/interfaces/`)
+
+Defines the contract for all system components using Python's `typing.Protocol`.
+
+**Key Protocols:**
+- `IDataLoader`: Data loading contract
+- `IPreprocessor`: Signal cleaning contract
+- `IBaselineCalculator`, `IVariabilityCalculator`, etc.: Rule engine contracts
+- `IFeatureExtractor`: MOMENT embedding contract
+- `IClassifier`: machine learning model contract
+- `IAlertGenerator`: Alert generation contract
+
+This layer ensures that components are loosely coupled and easily swappable (e.g., replacing XGBoost with Random Forest requires only implementing `IClassifier`).
+
+### 5.11 Adapters (`src/adapters/`)
+
+Wrappers that adapt existing implementation classes/functions to the new Protocols.
+
+**Modules:**
+- `rule_adapters.py`: Wraps functional rule logic (`calculate_baseline`, etc.) into class-based adapters.
+- `model_adapters.py`: Wraps `MomentFeatureExtractor` and `XGBClassifierWrapper`.
+- `data_adapters.py`: Wraps `CTUDataLoader` and `CTGPreprocessor`.
+- `analysis_adapters.py`: Wraps `apply_medical_override` and `generate_alert`.
+
+### 5.12 Pipeline Orchestration (`src/pipeline/`)
+
+The core of the modular architecture.
+
+#### `container.py` - PipelineContainer
+Dependency Injection container that holds references to all components.
+- **Method**: `create_default()` instantiates the container with standard SentinelFetal adapters.
+- **Usage**: Allows overriding specific components (e.g., `container.classifier = MockClassifier()`) before pipeline creation.
+
+#### `analysis_pipeline.py` - AnalysisPipeline
+Orchestrates the data flow:
+1. Validates container completeness
+2. Calls `preprocessor.process()`
+3. Calls all rule calculators
+4. Calls `feature_extractor` & `fusion`
+5. Calls `classifier.predict()`
+6. Calls `medical_override` & `alert_generator`
+7. Returns comprehensive `AnalysisResult` dataclass
+
+---
+
 ## 6. Test Suite (`tests/`)
 
 | Test File | Coverage |
 |-----------|----------|
+| `test_modular_pipeline.py` | **New**: Pipeline container, DI, adapters, and end-to-end modular flow |
 | `test_preprocessing.py` | Gap fill, spike detection, out-of-range handling |
 | `test_rules.py` | 26 unit tests: baseline (6), variability (5), decelerations (5), tachysystole (3), sinusoidal (5), integration (2) |
 | `test_phase4.py` | Phase 4 (model training) tests |
-| `test_pipeline_integration.py` | End-to-end pipeline tests |
+| `test_pipeline_integration.py` | End-to-end pipeline tests (legacy flow) |
 | `test_simulation_core.py` | Orchestrator, ring buffer, patient generator |
 | `test_simulation_integration.py` | Full simulation integration |
 | `test_ui_components.py` | UI component tests |
 
 **Run Tests:**
 ```bash
+# Run all tests (including new modular tests)
 pytest tests/ -v
 pytest tests/ --cov=src --cov-report=html
 ```
@@ -1176,6 +1281,29 @@ python src/training/prepare_data.py --limit 50 --use_mock False
 
 # Train model
 python src/training/train_demo.py
+```
+
+### 8.8 Run Modular Analysis Pipeline (New Standard)
+
+```python
+from src.pipeline.container import PipelineContainer
+from src.pipeline.analysis_pipeline import AnalysisPipeline
+
+# 1. Initialize Container with default adapters
+container = PipelineContainer.create_default()
+
+# 2. (Optional) Swap a component
+# container.classifier = MyCustomClassifier()
+
+# 3. Create Pipeline
+pipeline = AnalysisPipeline(container)
+
+# 4. Run Analysis
+# fhr and uc are numpy arrays
+result = pipeline.analyze(fhr, uc)
+
+print(f"Category: {result.category}")
+print(f"Explanation: {result.alert.explanation}")
 ```
 
 ---
