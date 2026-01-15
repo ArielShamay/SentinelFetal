@@ -14,6 +14,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Fix encoding for Windows console
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
 
 def main():
     """Launch the simulation dashboard."""
@@ -26,7 +30,7 @@ def main():
         sys.exit(1)
     
     print("=" * 60)
-    print("🏥 SentinelFetal Real-Time Simulator")
+    print("[+] SentinelFetal Real-Time Simulator")
     print("=" * 60)
     print()
     print("Launching simulation dashboard...")
