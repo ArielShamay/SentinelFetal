@@ -9,10 +9,13 @@
 ## Table of Contents
 
 1. [Chapter 1: System Architecture & Purpose](#chapter-1-system-architecture--purpose)
-   - [1.1 What is SentinelFetal?](#11-what-is-sentinelfetal)
-   - [1.2 Why Was It Built?](#12-why-was-it-built)
-   - [1.3 High-Level Architecture](#13-high-level-architecture)
-   - [1.4 Component Breakdown](#14-component-breakdown)
+    - [1.1 What is SentinelFetal?](#11-what-is-sentinelfetal)
+    - [1.2 Why Was It Built?](#12-why-was-it-built)
+    - [1.3 High-Level Architecture](#13-high-level-architecture)
+    - [1.4 Component Breakdown](#14-component-breakdown)
+    - [1.5 Data Assets: CTU-CHB/CTU-UHB](#15-data-assets-ctu-chbctu-uhb-intrapartum-ctg-database)
+    - [1.6 End-to-End Flow: Monitor → Alert](#16-end-to-end-flow-monitor--alert)
+    - [1.7 Synthetic Data Generation](#17-synthetic-data-generation)
 2. [Chapter 2: Codebase Deep Dive](#chapter-2-codebase-deep-dive)
    - [2.1 Simulation Engine](#21-simulation-engine)
    - [2.2 Signal Processing](#22-signal-processing)
@@ -29,6 +32,7 @@
    - [4.2 Running the Simulator](#42-running-the-simulator)
    - [4.3 Running Tests](#43-running-tests)
    - [4.4 Configuration Reference](#44-configuration-reference)
+5. [Appendix D: Repository Map](#appendix-d-repository-map)
 
 ---
 
@@ -289,6 +293,38 @@ SentinelFetal/
     2) **Training artifacts:** [src/training/prepare_data.py](src/training/prepare_data.py) runs the full pipeline over all records and saves features/labels to [data/processed/X.npy](data/processed/X.npy) and [data/processed/y.npy](data/processed/y.npy).
     3) **Classifier training:** [src/training/train_demo.py](src/training/train_demo.py) consumes X/y to train the hybrid XGBoost model saved at [models/xgb_demo.json](models/xgb_demo.json) using the config at [models/xgb_demo.config.json](models/xgb_demo.config.json).
 - **Why needed:** Provides real intrapartum CTG with clinical ground truth (pH) to calibrate thresholds, train the hybrid classifier, and validate rule/ML outputs against physiologic outcomes.
+
+---
+
+## 1.6 End-to-End Flow: Monitor → Alert
+
+**Real data path (clinical monitors):**
+1) **Acquisition:** Monitors emit FHR/UC at 4 Hz → ingested as WFDB streams or batch files.
+2) **Buffering:** Signals stored in per-patient `RingBuffer` (10 minutes, 2,400 samples) to support sliding-window analysis without memory growth.
+3) **Preprocessing:** `CTGPreprocessor` removes out-of-range values (50–240 bpm), spikes (>30 bpm step), fills ≤10s gaps, and applies Savitzky-Golay smoothing (11-window, poly=2) to preserve decel shape.
+4) **Rule Engine:** `baseline`, `variability`, `decelerations`, `sinusoidal`, `tachysystole` extract 11 clinically grounded features and flags (e.g., recurrent late decels, tachysystole, sinusoidal yes/no).
+5) **Foundation Embedding:** MOMENT encoder generates a 1,024-dim representation of the 10-minute FHR segment (zero-shot, no fine-tuning).
+6) **Feature Fusion:** `FeatureFusion` concatenates embedding + 11 rule features → 1,035-dim normalized vector.
+7) **Classifier:** XGBoost (`HybridClassifier`) outputs Cat1/2/3 probabilities.
+8) **Safety Net:** `MedicalOverride` enforces clinical guardrails (sinusoidal → Cat3; absent variability + recurrent decels/brady → Cat3; bradycardia or recurrent late decels → ≥Cat2; absent variability cannot be Normal).
+9) **Alerting & UI:** `AlertGenerator` emits Hebrew headline/explanation/findings/recommendations; Streamlit UI renders patient grid, traces, and alerts in real time.
+
+**Synthetic path (simulator):**
+1) `SimulationOrchestrator` ticks at 1 Hz for up to 8 patients; MOMENT is staggered (~3.75s per patient) to keep CPU <25%.
+2) `PatientGenerator` synthesizes FHR/UC using baseline + variability + contraction models; events are injected from `event_types` with severity presets (mild/moderate/severe) controlling depth/lag/recovery/recurrence.
+3) Output flows through the same buffer → preprocessing → rules → MOMENT → fusion → classifier → override → alerts, ensuring simulation fidelity to production logic.
+
+## 1.7 Synthetic Data Generation
+
+- **Purpose:** Safe, repeatable clinical scenarios without PHI; used for demos, robustness tests, and regression of the rule/ML stack.
+- **Event catalog (from `src/simulation/events/event_types.py`):** late, variable, prolonged, early decels; tachysystole; brady/tachycardia; absent/minimal/marked variability; sinusoidal pattern. Each has parameterized severities (e.g., late decel mild/moderate/severe control depth/lag/recovery/recurrence).
+- **Signal models:**
+    - UC generator: peaks spaced by configurable contractions_per_10min with noise and prominence constraints.
+    - FHR generator: baseline + variability + decel shapes keyed to UC peaks; optional sinusoidal overlay; brady/tachy ramps.
+- **Quality controls:**
+    - RingBuffer prevents drift; gaps/spikes injected to test preprocessing robustness.
+    - Savitzky-Golay smoothing improves decel timing/shape preservation vs. median filter (Phase 13 upgrade).
+- **Robustness harness:** 500-scenario sweeps vary noise σ∈{0,2,5,10,15}, dropout∈{0,5%,10%}, pattern type, and severity to measure detection sensitivity and false positives end-to-end.
 
 ---
 
@@ -1289,6 +1325,25 @@ class Alert:
 | Samples/Second | 4 Hz × 8 patients = 32 |
 | MOMENT Windows/Second | 0.535 (staggered) |
 
+### Load & Stability Benchmarks (Latest)
+
+| Benchmark | Scenario | Result | Notes |
+|-----------|----------|--------|-------|
+| Load (Phase 10) | 1-hour, 8 patients, 12 injections | ✅ Pass | Max tick latency 162.6 ms; RAM 367.7 MB; +1.89 MB/hr growth |
+| Robustness (Phase 13) | 500 scenarios (noise/dropout sweep) | Detection 64.0%, FPR 0.0% | Sinusoidal clean 100%; Prolonged/Brady/Tachy 100% across noise; Late/Variable improved after Savitzky-Golay |
+| MOMENT Baseline | Load + inference timing | 11.1s load; 1.87s inference mean | CPU-only measurements |
+
+### Detection Constraints (Clinically Tuned)
+
+| Pattern | Constraint | Purpose |
+|---------|------------|---------|
+| Baseline | 110–160 bpm normal; brady <110; tachy >160 | Align with Position Paper ranges |
+| Variability | Absent ≤2, Minimal ≤5, Moderate ≤25, Marked >25 bpm | Moderate is primary well-being indicator |
+| Decelerations | Depth ≥12 bpm, duration ≥12s; descent ≥0.5 bpm/sample → Variable; lag >15s → Late | Improve robustness under noise (Phase 13) |
+| Sinusoidal | 3–5 cycles/min, amplitude 5–25 bpm, dominance ≥0.15, ≥20 min | Always Category 3 safety rule |
+| Tachysystole | >5 contractions/10 min (UC peaks) | Uterine hyperstimulation detection |
+| Overrides | Sinusoidal → Cat3; Absent variability + recurrent decels/brady → Cat3; Brady or recurrent late → ≥Cat2; Absent variability never Normal | Safety net to prevent dangerous downgrades |
+
 ---
 
 # Chapter 4: Setup & Operations
@@ -1550,7 +1605,29 @@ MOMENT_INTERVAL_SECONDS = 30.0
 | Phase 11 | Jan 2025 | Robustness torture test |
 | Phase 12 | Jan 2025 | Massive scale robustness (500 scenarios) |
 | Phase 13 | Jan 2025 | Signal processing upgrade (Savitzky-Golay) |
-| Phase 15 | Jan 2025 | Grand Unification documentation |
+| Phase 15 | Jan 2026 | Grand Unification documentation |
+
+---
+
+# Appendix D: Repository Map
+
+| Path | Purpose | Key Contents |
+|------|---------|--------------|
+| [src/analysis](src/analysis) | Alerting & safety | `alerts.py` (Hebrew alerts), `override.py` (medical safety net) |
+| [src/config.py](src/config.py) | Global configuration | Clinical thresholds, data/model paths, UI strings |
+| [src/data](src/data) | Data ingestion & preprocessing | `loader.py` (CTU loader, pH parsing), `preprocess.py` (clean + Savitzky-Golay) |
+| [src/models](src/models) | AI components | `moment_encoder.py` (MOMENT), `fusion.py` (1,035-dim), `classifier.py` (XGBoost) |
+| [src/rules](src/rules) | Clinical rule engine | Baseline, variability, decelerations, sinusoidal, tachysystole |
+| [src/simulation](src/simulation) | Real-time simulator | `core/` (orchestrator, ring buffer), `generators/` (patient & UC/FHR), `events/` (patterns), `processing/` (pipeline adapter) |
+| [src/ui](src/ui) | Streamlit apps | `app.py`, `simulation_app.py`, `plots.py` |
+| [src/training](src/training) | Dataset → features → model | `prepare_data.py` (build X.npy/y.npy), `train_demo.py` (train/save XGBoost) |
+| [tests](tests) | Unit, integration, benchmarks | `test_*.py`, `benchmarks/` (accuracy, clinical, load, robustness) |
+| [data/ctu-chb-intrapartum-cardiotocography-database-1.0.0](data/ctu-chb-intrapartum-cardiotocography-database-1.0.0) | Raw CTU-UHB intrapartum CTG | WFDB records (.hea, .dat) |
+| [data/processed](data/processed) | Precomputed features/labels | `X.npy`, `y.npy` |
+| [models](models) | Saved model artifacts | `xgb_demo.json`, `xgb_demo.config.json` |
+| [scripts](scripts) | Utility/launchers | `run_simulation.py`, `visualize_preprocessing.py`, `README.md` |
+| [docs/reports](archive/docs/reports) | Test reports (archived) | Robustness, endurance, evaluation summaries |
+| [archive/docs](archive/docs) | Archived specs/PRDs/cheat sheets | Historical documentation set |
 
 ---
 
