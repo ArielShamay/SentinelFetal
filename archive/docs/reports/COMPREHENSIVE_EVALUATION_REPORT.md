@@ -1,4 +1,10 @@
-## Comprehensive Evaluation Report (Phase A/B)
+---
+title: Phase 8 – Comprehensive Accuracy & Load Evaluation
+date: 2026-01-16
+description: Synthetic pattern detection accuracy and MOMENT/load benchmarks (Phase A/B).
+---
+
+# Phase 8: Comprehensive Evaluation Report
 
 Date: 2026-01-16  
 Scope: Optimized Phase A benchmarks on synthetic signals and limited load tests (CPU-only), plus Phase B calibration reruns.  

@@ -152,14 +152,14 @@ class CTGPreprocessor:
     def process(
         self, 
         fhr: np.ndarray, 
-        apply_smoothing: bool = False
+        apply_smoothing: bool = True
     ) -> PreprocessingResult:
         """
         Process a FHR signal through the full preprocessing pipeline.
         
         Args:
             fhr: Raw FHR signal array (1D numpy array).
-            apply_smoothing: Whether to apply median filter smoothing.
+            apply_smoothing: Whether to apply median filter smoothing (default True).
             
         Returns:
             PreprocessingResult with processed signal and metadata.
@@ -189,9 +189,9 @@ class CTGPreprocessor:
         # Step 4: Fill gaps according to 10-second rule
         processed, filled_mask, unfilled_mask = self._fill_gaps(processed)
         
-        # Step 5: Optional smoothing
+        # Step 5: Optional smoothing (Phase 13: Savitzky-Golay filter)
         if apply_smoothing:
-            processed = self._apply_median_filter(processed)
+            processed = self._apply_smoothing_filter(processed)
         
         # Calculate statistics
         stats = self._calculate_stats(original, processed, nan_mask, filled_mask)
@@ -399,12 +399,17 @@ class CTGPreprocessor:
             
         return signal, True
     
-    def _apply_median_filter(self, signal: np.ndarray) -> np.ndarray:
+    def _apply_smoothing_filter(self, signal: np.ndarray) -> np.ndarray:
         """
-        Apply median filter for smoothing while preserving sharp edges.
+        Apply Savitzky-Golay filter for smoothing while preserving peak/valley shapes.
         
-        Median filtering is preferred over moving average because it preserves
-        the sharp edges of decelerations (important for clinical interpretation).
+        Savitzky-Golay filtering is preferred over median or moving average because it:
+        - Preserves the shape of decelerations (peaks and valleys)
+        - Removes high-frequency noise effectively
+        - Maintains amplitude of clinical events
+        
+        Phase 13 upgrade: Replaced median filter with savgol_filter for better
+        detection of deceleration patterns under noisy conditions.
         
         Args:
             signal: Signal to smooth.
@@ -412,20 +417,49 @@ class CTGPreprocessor:
         Returns:
             Smoothed signal with NaN values preserved.
         """
-        window = self.config.smoothing_window
-        if window < 2:
+        # Savitzky-Golay parameters optimized for CTG at 4Hz
+        # window_length=11 (2.75s at 4Hz) captures local shape
+        # polyorder=2 (quadratic) preserves peaks/valleys
+        window_length = 11
+        polyorder = 2
+        
+        # Handle NaN values - savgol_filter doesn't support NaN
+        nan_mask = np.isnan(signal)
+        if np.all(nan_mask):
             return signal
         
-        # Ensure window is odd for symmetric filtering
-        if window % 2 == 0:
-            window += 1
-            
-        # Use pandas for NaN-aware rolling median
-        smoothed = pd.Series(signal).rolling(
-            window=window, 
-            center=True, 
-            min_periods=1
-        ).median().values
+        # Replace NaN with interpolated values temporarily
+        signal_clean = signal.copy()
+        if np.any(nan_mask):
+            # Use linear interpolation for NaN gaps
+            valid_indices = np.where(~nan_mask)[0]
+            if len(valid_indices) > 1:
+                signal_clean = np.interp(
+                    np.arange(len(signal)),
+                    valid_indices,
+                    signal[valid_indices]
+                )
+            else:
+                # Not enough valid points - return as is
+                return signal
+        
+        # Ensure we have enough samples for the filter
+        if len(signal_clean) < window_length:
+            # Fall back to simple smoothing for short signals
+            smoothed = pd.Series(signal_clean).rolling(
+                window=5, center=True, min_periods=1
+            ).mean().values
+        else:
+            # Apply Savitzky-Golay filter
+            smoothed = scipy_signal.savgol_filter(
+                signal_clean, 
+                window_length=window_length, 
+                polyorder=polyorder,
+                mode='interp'
+            )
+        
+        # Restore NaN positions
+        smoothed[nan_mask] = np.nan
         
         return smoothed
     

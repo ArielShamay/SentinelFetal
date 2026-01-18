@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B)](https://streamlit.io/)
 
 **Hybrid AI System for Fetal Monitoring** combining MOMENT foundation model with rule-based engine based on the Israeli Position Paper on CTG Interpretation.
 
@@ -23,45 +24,24 @@ The system classifies CTG recordings into three medical categories:
 
 ## 🏗️ Architecture
 
+```mermaid
+flowchart TD
+   A[CTG Signal FHR+UC] --> B[Preprocess]
+   A --> C[MOMENT Embeddings 1024-dim]
+   A --> D[Rule Engine 11-dim]
+   B --> E[Fusion 1035-dim]
+   C --> E
+   D --> E
+   E --> F[XGBoost Classifier]
+   F --> G[Medical Override Safety Net]
+   G --> H[Alerts + XAI]
 ```
-┌─────────────┐
-│  CTG Signal │
-│ (FHR + UC)  │
-└──────┬──────┘
-       │
-       ├──────────────────┬───────────────────┐
-       │                  │                   │
-       v                  v                   v
-┌─────────────┐   ┌─────────────┐   ┌─────────────┐
-│Preprocessing│   │ MOMENT      │   │ Rule Engine │
-│ - Gap Fill  │   │ Embeddings  │   │ - Baseline  │
-│ - Spike Det │   │ (1024-dim)  │   │ - Variability│
-│ - 10s Rule  │   │             │   │ - Decels    │
-└──────┬──────┘   └──────┬──────┘   │ - Tachysyst │
-       │                  │          │ - Sinusoidal│
-       │                  │          └──────┬──────┘
-       │                  │                 │
-       └──────────────────┴─────────────────┘
-                          │
-                          v
-                   ┌─────────────┐
-                   │   Hybrid    │
-                   │ Classifier  │
-                   │ (Cat 1/2/3) │
-                   └─────────────┘
-```
+
+- **Safety Net:** Medical overrides enforce critical findings (sinusoidal → Cat 3; brady/recurrent lates → Cat 2 safety floor) regardless of ML output.
 
 ---
 
-## 📦 Installation
-
-### Requirements
-- Python 3.9+
-- NumPy, pandas, scipy
-- wfdb (for CTU-UHB dataset)
-- pytest (for testing)
-
-### Setup
+## 📦 Installation & Setup
 
 ```bash
 # Clone repository
@@ -69,15 +49,34 @@ git clone https://github.com/ArielShamay/SentinelFetal.git
 cd SentinelFetal
 
 # Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv .venv
+.\.venv\Scripts\activate   # Windows PowerShell
+# Or: source .venv/bin/activate  # Linux/macOS
 
 # Install dependencies
 pip install -r requirements.txt
 
+# Set PYTHONPATH
+$env:PYTHONPATH = "."  # Windows PowerShell
+# Or: export PYTHONPATH=.  # Linux/macOS
+
+# Verify environment
+python scripts/verify_system.py
+
 # Run tests
 pytest tests/
 ```
+
+---
+
+## 🚀 How to Run
+
+| Task | Command |
+|------|---------|
+| **Simulation Dashboard** (8-patient real-time) | `python scripts/run_simulation.py` |
+| **Main Dashboard** (analysis/plots) | `streamlit run src/ui/app.py` |
+| **Verify Environment** | `python scripts/verify_system.py` |
+| **Run Tests** | `pytest tests/ -v` |
 
 ---
 
@@ -92,141 +91,55 @@ Download from: https://physionet.org/content/ctu-uhb-ctgdb/1.0.0/
 
 ---
 
-## 🚀 Usage
+## 📂 Project Structure
 
-### Data Loading & Preprocessing
-
-```python
-from src.data.loader import CTUDataLoader
-from src.data.preprocess import CTGPreprocessor, PreprocessingConfig
-
-# Load CTG record
-loader = CTUDataLoader("data/ctu-chb-intrapartum-cardiotocography-database-1.0.0")
-record = loader.load_record("1001")
-
-# Preprocess signal
-config = PreprocessingConfig(sampling_rate=4.0, max_gap_seconds=10.0)
-preprocessor = CTGPreprocessor(config)
-result = preprocessor.process(record.fhr1)
-
-print(f"Filled {result.stats['filled_percent']:.1f}% of gaps")
-print(f"Mean FHR: {result.stats['mean_fhr']:.1f} bpm")
 ```
-
-### Rule Engine
-
-```python
-from src.rules import (
-    calculate_baseline,
-    <div align="center">
-
-    # SentinelFetal
-
-    [![Python](https://img.shields.io/badge/Python-3.9-blue)](https://www.python.org/)  
-    [![AI](https://img.shields.io/badge/Hybrid-AI%20%2B%20Rules-8A2BE2)](#)  
-    [![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B)](https://streamlit.io/)  
-    [![PyTorch](https://img.shields.io/badge/PyTorch-Model%20Backbone-EE4C2C)](https://pytorch.org/)
-
-    </div>
-
 SentinelFetal/
-    SentinelFetal is a real-time fetal distress detection platform for CTG (FHR + UC) that fuses a clinical rule engine with foundation-model embeddings:
-    - **Hybrid AI:** MOMENT embeddings (1024-dim) + rule features (11-dim) fused into a 1035-dim vector for XGBoost.
-    - **Safety Net:** Medical overrides enforce critical findings (sinusoidal, bradycardia, recurrent lates) regardless of ML output.
-    - **Real-Time Simulation:** Up to 8 concurrent synthetic patients with event injection, ring buffer, and staggered processing.
-    - **Streamlit Dashboards:** Hebrew/English alerts, trend plots, and a training/demo simulator.
-
-    ## Installation & Setup
-    ```bash
-    py -m venv .venv
-    .\.venv\Scripts\activate           # PowerShell
-    pip install -r requirements.txt
-    set PYTHONPATH=.
-    ```
-
-    ## How to Run
-    - **Simulation Dashboard (multi-patient):**
-      ```bash
-      py scripts/run_simulation.py
-      ```
-    - **Main Dashboard (analysis/plots):**
-      ```bash
-      streamlit run src/ui/app.py
-      ```
-    - **Verify environment:**
-      ```bash
-      py scripts/verify_system.py
-      ```
-
-    ## Architecture (Hybrid Pipeline)
-    ```mermaid
-    flowchart TD
-       A[CTG Signal (FHR+UC)] --> B[Preprocess]
-       A --> C[MOMENT Embeddings]
-       A --> D[Rule Engine]
-       B --> E[Fusion 1035-dim]
-       C --> E
-       D --> E
-       E --> F[XGBoost Classifier]
-       F --> G[Medical Override Safety Net]
-       G --> H[Alerts + XAI]
-    ```
-
-    ## Project Structure (abridged)
-    ```
-    SentinelFetal/
-    ├─ src/
-    │  ├─ pipeline/        # DI container + AnalysisPipeline
-    │  ├─ analysis/        # Alerts, overrides
-    │  ├─ rules/           # Baseline, variability, decels, sinusoidal
-    │  ├─ simulation/      # Orchestrator, generators, events
-    │  ├─ models/          # MOMENT encoder, XGBoost wrapper
-    │  ├─ ui/              # Streamlit apps
-    │  └─ utils/           # Signal utilities
-    ├─ scripts/            # run_simulation.py, verify_system.py, etc.
-    ├─ tests/              # Unit + integration + benchmarks
-    ├─ docs/               # Specs, PRDs, evaluation reports
-    └─ models/             # Saved demo model + config
-    ```
-
-    ## Phase Highlights
-    - **Hybrid AI:** Rules + MOMENT embeddings with XGBoost classifier.
-    - **Safety Overrides:** Sinusoidal → Cat 3; brady/recurrent lates → Cat 2 safety floor.
-    - **Simulation:** 8-patient orchestrator with event injection and Streamlit dashboards.
-    - **Benchmarks:** Phase C clinical validation passes (sinusoidal/late severe/brady → elevated categories, normal → Cat 1).
-
-    ## Full Documentation
-    See the master reference: [SENTINEL_FETAL_MASTER_DOC.md](SENTINEL_FETAL_MASTER_DOC.md)
-
-    ## License
-    Proprietary / internal use. Contact project owners for redistribution terms.
-├── data/                           # Dataset storage
-│   └── ctu-chb.../                # CTU-UHB database
-├── docs/                           # Documentation
-│   ├── SentinelFetal_PRD.docx.txt
-│   ├── SentinelFetal_TechSpec.docx.txt
-│   └── SentinelFetal_Gen35_Spec.docx.txt
-├── models/                         # Saved models
-├── notebooks/                      # Jupyter notebooks
 ├── src/
-│   ├── data/
-│   │   ├── loader.py              # CTU-UHB data loader
-│   │   └── preprocess.py          # Signal preprocessing
-│   ├── rules/
-│   │   ├── baseline.py            # Baseline FHR calculation
-│   │   ├── variability.py         # Variability analysis
-│   │   ├── decelerations.py       # Deceleration detection
-│   │   ├── tachysystole.py        # Tachysystole detection
-│   │   └── sinusoidal.py          # Sinusoidal pattern detection
-│   └── visualize_preprocessing.py # Visualization tools
-├── tests/
-│   ├── test_preprocessing.py
-│   └── test_rules.py              # 26 unit tests
-├── .gitignore
-├── DEVELOPMENT_PLAN.md
-├── README.md
-└── requirements.txt
+│   ├── pipeline/          # DI container + AnalysisPipeline
+│   ├── analysis/          # Alerts, overrides
+│   ├── rules/             # Baseline, variability, decels, sinusoidal
+│   ├── simulation/        # Orchestrator, generators, events
+│   ├── models/            # MOMENT encoder, XGBoost wrapper
+│   ├── ui/                # Streamlit apps
+│   └── utils/             # Signal utilities
+├── scripts/               # run_simulation.py, verify_system.py
+├── tests/                 # Unit + integration + benchmarks
+├── docs/
+│   └── reports/           # Benchmark & evaluation reports
+├── archive/docs/          # Superseded specs & PRDs
+├── models/                # Saved demo model + config
+└── data/                  # CTU-UHB database
 ```
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[SENTINEL_FETAL_MASTER_DOC.md](SENTINEL_FETAL_MASTER_DOC.md)** | Full technical manual & API reference |
+| **[DEMO_CHEAT_SHEET.md](DEMO_CHEAT_SHEET.md)** | Quick demo commands |
+| **[DEMO_SCRIPT.md](DEMO_SCRIPT.md)** | Full demo walkthrough |
+
+### Benchmark Reports
+
+| Report | Phase | Description |
+|--------|-------|-------------|
+| [COMPREHENSIVE_EVALUATION_REPORT.md](docs/reports/COMPREHENSIVE_EVALUATION_REPORT.md) | Phase 8 | Accuracy & load benchmarks |
+| [hourly_simulation_summary.md](docs/reports/hourly_simulation_summary.md) | Phase 9 | 4-patient batch simulation |
+| [ENDURANCE_TEST_REPORT.md](docs/reports/ENDURANCE_TEST_REPORT.md) | Phase 10 | 1-hour real-time stability |
+| [ROBUSTNESS_TEST_REPORT.md](docs/reports/ROBUSTNESS_TEST_REPORT.md) | Phase 11 | Noise/dropout/artifact torture test |
+| [MASSIVE_ROBUSTNESS_REPORT.md](docs/reports/MASSIVE_ROBUSTNESS_REPORT.md) | Phase 13 | 500-scenario massive scale stress test (64% detection) |
+
+### Archived Specs (reference only)
+
+Located in `archive/docs/`:
+- SentinelFetal_PRD.docx.txt
+- SentinelFetal_TechSpec.docx.txt
+- SentinelFetal_Gen35_Spec.docx.txt
+- SentinelFetal_RealTimeSimulator_SPEC_Part1.md / Part2.md
+- DEVELOPMENT_PLAN.md
 
 ---
 
@@ -236,7 +149,6 @@ SentinelFetal/
 - **Normal**: 110-160 bpm
 - **Bradycardia**: <110 bpm
 - **Tachycardia**: >160 bpm
-- Calculation: Mean FHR in 2-min stable segment (variability <25 bpm), rounded to nearest 5
 
 ### Variability
 - **Absent**: 0-2 bpm (Category 3 if >50 min)
@@ -245,67 +157,30 @@ SentinelFetal/
 - **Marked**: >25 bpm
 
 ### Decelerations
-Classification by lag time from contraction peak:
-- **Early**: <5 seconds (benign)
-- **Late**: >15 seconds (concerning - Category 2/3)
-- **Variable**: Abrupt onset (>0.5 bpm/sample)
-
-Criteria: ≥15 bpm below baseline, duration 15s-10min
+- **Early**: <5 s lag (benign)
+- **Late**: >15 s lag (concerning)
+- **Variable**: Abrupt onset
 
 ### Tachysystole
-- **Definition**: >5 contractions per 10 minutes
-- **Window**: Averaged over 30 minutes
+- >5 contractions per 10 minutes (averaged over 30 min)
 
 ### Sinusoidal Pattern ⚠️
 - **SEVERE FINDING** - Always Category 3
-- Frequency: 3-5 cycles/minute
-- Amplitude: 5-15 bpm
-- Duration: >20 minutes
-- Clinical significance: Fetal anemia, severe hypoxia
+- Frequency: 3-5 cycles/min, amplitude 5-15 bpm, >20 min duration
 
 ---
 
 ## 📈 Development Phases
 
-- [x] **Phase 1**: Data Pipeline (Complete)
-  - CTU-UHB loader
-  - Preprocessing with 10-second rule
-  - Gap filling & spike detection
-  - Unit tests & validation
-
-- [x] **Phase 2**: Rule Engine (Complete)
-  - Baseline calculator
-  - Variability analyzer
-  - Deceleration classifier
-  - Tachysystole detector
-  - Sinusoidal pattern detector
-  - 26 unit tests
-
-- [ ] **Phase 3**: MOMENT Integration (In Progress)
-  - Load MOMENT model (AutonLab/MOMENT-1-large)
-  - Extract 1024-dim embeddings
-  - Zero-shot inference
-
-- [ ] **Phase 4**: Hybrid Classifier
-  - Feature fusion (MOMENT + Rules)
-  - Category 1/2/3 classification
-  - Confidence scoring
-
-- [ ] **Phase 5**: Real-time System
-  - Streaming data handler
-  - Alert system
-  - Dashboard UI
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- [x] Phase 1-2: Data Pipeline + Rule Engine
+- [x] Phase 3-4: MOMENT Integration + Hybrid Classifier
+- [x] Phase 5-7: Real-time Simulation + Dashboards
+- [x] Phase 8: Comprehensive Evaluation
+- [x] Phase 9: Hourly Batch Simulation
+- [x] Phase 10: Endurance (1-hr stability)
+- [x] Phase 11: Robustness Torture Test + Doc Cleanup
+- [x] Phase 12: Massive Scale Robustness (500 scenarios, 59.8% detection, 0% false positives)
+- [x] Phase 13: Signal Processing Upgrade (Savitzky-Golay filter, 64.0% detection, 0% FP, sinusoidal 100%)
 
 ---
 
@@ -326,13 +201,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👨‍💻 Author
 
-**Ariel Shamay**
-- GitHub: [@ArielShamay](https://github.com/ArielShamay)
-
----
-
-## 🙏 Acknowledgments
-
-- PhysioNet for providing the CTU-UHB database
-- AutonLab for the MOMENT foundation model
-- Israeli Ministry of Health for clinical guidelines
+**Ariel Shamay** - [@ArielShamay](https://github.com/ArielShamay)

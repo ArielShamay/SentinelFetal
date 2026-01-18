@@ -89,8 +89,8 @@ def detect_sinusoidal_pattern(
     freq_min_cycles_per_min: float = 3.0,
     freq_max_cycles_per_min: float = 5.0,
     amp_min: float = 5.0,
-    amp_max: float = 15.0,
-    dominance_threshold: float = 0.3
+    amp_max: float = 25.0,  # Phase 13: Relaxed from 15 to 25 bpm
+    dominance_threshold: float = 0.15  # Phase 13: Relaxed from 0.3 to 0.15
 ) -> SinusoidalResult:
     """
     Detect sinusoidal pattern in FHR signal.
@@ -99,8 +99,13 @@ def detect_sinusoidal_pattern(
         1. Take the last `min_duration_minutes` of the signal
         2. Perform FFT to analyze frequency content
         3. Look for dominant peak in 3-5 cycles/minute range (0.05-0.083 Hz)
-        4. Check if amplitude is in 5-15 bpm range
+        4. Check if amplitude is in valid range (Phase 13: relaxed to 5-25 bpm)
         5. If both criteria met → Sinusoidal pattern detected
+    
+    Phase 13 Changes:
+        - Amplitude range relaxed: 5-25 bpm (was 5-15 bpm)
+        - Dominance threshold reduced: 0.15 (was 0.3)
+        - Better noise tolerance via preprocessing upstream
     
     WARNING: Sinusoidal pattern is a SEVERE finding that ALWAYS results in
     Category 3 classification, regardless of other parameters.
@@ -112,8 +117,8 @@ def detect_sinusoidal_pattern(
         freq_min_cycles_per_min: Minimum frequency in cycles/min (default: 3.0).
         freq_max_cycles_per_min: Maximum frequency in cycles/min (default: 5.0).
         amp_min: Minimum amplitude in bpm (default: 5.0).
-        amp_max: Maximum amplitude in bpm (default: 15.0).
-        dominance_threshold: Minimum ratio for frequency dominance (default: 0.3).
+        amp_max: Maximum amplitude in bpm (default: 25.0, relaxed in Phase 13).
+        dominance_threshold: Minimum ratio for frequency dominance (default: 0.15).
         
     Returns:
         SinusoidalResult with detection outcome and analysis metrics.
@@ -206,7 +211,13 @@ def detect_sinusoidal_pattern(
     frequency_ok = freq_min_hz <= dominant_frequency <= freq_max_hz
     dominance_ok = dominance_ratio >= dominance_threshold
     
-    detected = frequency_ok and dominance_ok and amplitude_in_range
+    # Phase 13: Relaxed amplitude check
+    # If frequency is strong (dominance_ratio > 0.25), allow wider amplitude range
+    amplitude_in_range = amp_min <= amplitude <= amp_max
+    strong_frequency = dominance_ratio >= 0.25
+    
+    # Detect if: (frequency OK AND dominance OK) AND (amplitude in range OR strong frequency)
+    detected = frequency_ok and dominance_ok and (amplitude_in_range or strong_frequency)
     
     # Calculate confidence
     confidence = _calculate_confidence(

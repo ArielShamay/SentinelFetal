@@ -1,0 +1,708 @@
+{
+  "sampling_rate": 4.0,
+  "total_seconds": 3600,
+  "window_seconds": 600,
+  "step_seconds": 120,
+  "results": {
+    "P1_control": {
+      "events": [],
+      "analysis": {
+        "cat_counts": {
+          "1": 26,
+          "2": 0,
+          "3": 0
+        },
+        "timeline": [
+          {
+            "start_sec": 0.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 120.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 240.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 360.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 480.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 600.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 720.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 840.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 960.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1080.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1200.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1320.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1440.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1560.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1680.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1800.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1920.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2040.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2160.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2280.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2400.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2520.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2640.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2760.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2880.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 3000.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          }
+        ]
+      }
+    },
+    "P2_sinusoidal": {
+      "events": [
+        [
+          900,
+          "SINUSOIDAL_PATTERN",
+          600.0
+        ]
+      ],
+      "analysis": {
+        "cat_counts": {
+          "1": 26,
+          "2": 0,
+          "3": 0
+        },
+        "timeline": [
+          {
+            "start_sec": 0.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 120.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 240.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 360.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 480.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 600.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 720.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 840.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 960.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1080.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1200.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1320.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1440.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1560.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1680.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1800.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1920.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2040.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2160.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2280.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2400.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2520.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2640.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2760.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2880.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 3000.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          }
+        ]
+      }
+    },
+    "P3_late": {
+      "events": [
+        [
+          1200,
+          "LATE_DECELERATION",
+          300.0
+        ],
+        [
+          2400,
+          "LATE_DECELERATION",
+          300.0
+        ]
+      ],
+      "analysis": {
+        "cat_counts": {
+          "1": 19,
+          "2": 7,
+          "3": 0
+        },
+        "timeline": [
+          {
+            "start_sec": 0.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 120.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 240.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 360.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 480.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 600.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 720.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 840.0,
+            "category": 1,
+            "confidence": 0.9888240694999695,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 960.0,
+            "category": 1,
+            "confidence": 0.9602687954902649,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1080.0,
+            "category": 2,
+            "confidence": 0.9611241221427917,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1200.0,
+            "category": 2,
+            "confidence": 0.9621098637580872,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1320.0,
+            "category": 1,
+            "confidence": 0.9621098637580872,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1440.0,
+            "category": 2,
+            "confidence": 0.9611241221427917,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1560.0,
+            "category": 2,
+            "confidence": 0.9602687954902649,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1680.0,
+            "category": 1,
+            "confidence": 0.9602687954902649,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1800.0,
+            "category": 1,
+            "confidence": 0.9612753391265869,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1920.0,
+            "category": 2,
+            "confidence": 0.9602687954902649,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2040.0,
+            "category": 1,
+            "confidence": 0.9602687954902649,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2160.0,
+            "category": 1,
+            "confidence": 0.9602687954902649,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2280.0,
+            "category": 1,
+            "confidence": 0.9612753391265869,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2400.0,
+            "category": 1,
+            "confidence": 0.9621098637580872,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2520.0,
+            "category": 1,
+            "confidence": 0.9611241221427917,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2640.0,
+            "category": 2,
+            "confidence": 0.9621098637580872,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2760.0,
+            "category": 2,
+            "confidence": 0.9621098637580872,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2880.0,
+            "category": 1,
+            "confidence": 0.9611241221427917,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 3000.0,
+            "category": 1,
+            "confidence": 0.9611241221427917,
+            "sinusoidal": false
+          }
+        ]
+      }
+    },
+    "P4_variable_brady": {
+      "events": [
+        [
+          1800,
+          "VARIABLE_DECELERATION",
+          300.0
+        ],
+        [
+          3000,
+          "BRADYCARDIA",
+          900.0
+        ]
+      ],
+      "analysis": {
+        "cat_counts": {
+          "1": 23,
+          "2": 3,
+          "3": 0
+        },
+        "timeline": [
+          {
+            "start_sec": 0.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 120.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 240.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 360.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 480.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 600.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 720.0,
+            "category": 1,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 840.0,
+            "category": 1,
+            "confidence": 0.9882166981697083,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 960.0,
+            "category": 1,
+            "confidence": 0.9879499673843384,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1080.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1200.0,
+            "category": 1,
+            "confidence": 0.9885236620903015,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1320.0,
+            "category": 1,
+            "confidence": 0.9890716671943665,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1440.0,
+            "category": 1,
+            "confidence": 0.9888240694999695,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1560.0,
+            "category": 1,
+            "confidence": 0.9602687954902649,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1680.0,
+            "category": 1,
+            "confidence": 0.9621098637580872,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1800.0,
+            "category": 1,
+            "confidence": 0.9611241221427917,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 1920.0,
+            "category": 1,
+            "confidence": 0.9592325687408447,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2040.0,
+            "category": 1,
+            "confidence": 0.9621098637580872,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2160.0,
+            "category": 1,
+            "confidence": 0.9611241221427917,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2280.0,
+            "category": 1,
+            "confidence": 0.9612753391265869,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2400.0,
+            "category": 1,
+            "confidence": 0.9612753391265869,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2520.0,
+            "category": 1,
+            "confidence": 0.9890716671943665,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2640.0,
+            "category": 1,
+            "confidence": 0.9890716671943665,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2760.0,
+            "category": 2,
+            "confidence": 0.9888240694999695,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 2880.0,
+            "category": 2,
+            "confidence": 0.9888240694999695,
+            "sinusoidal": false
+          },
+          {
+            "start_sec": 3000.0,
+            "category": 2,
+            "confidence": 0.9882638454437256,
+            "sinusoidal": false
+          }
+        ]
+      }
+    }
+  }
+}

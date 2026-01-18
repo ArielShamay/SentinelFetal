@@ -201,7 +201,8 @@ class TestEdgeCases:
         
         assert not np.any(result.nan_mask), "No values should be invalid"
         assert not np.any(result.filled_mask), "No gaps should need filling"
-        np.testing.assert_array_equal(result.processed_signal, fhr)
+        # Use approximate equality due to Savitzky-Golay filter introducing tiny numeric differences
+        np.testing.assert_allclose(result.processed_signal, fhr, rtol=1e-10)
     
     def test_gap_at_start(self, preprocessor):
         """Test handling of gap at signal start."""

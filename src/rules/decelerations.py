@@ -104,8 +104,8 @@ def detect_decelerations(
     uc: np.ndarray,
     baseline: float,
     sampling_rate: float = 4.0,
-    min_depth: float = 15.0,
-    min_duration_seconds: float = 15.0,
+    min_depth: float = 12.0,  # Phase 13: Relaxed from 15 to 12 bpm
+    min_duration_seconds: float = 12.0,  # Phase 13: Relaxed from 15 to 12 seconds
     max_duration_seconds: float = 600.0
 ) -> list[Deceleration]:
     """
@@ -113,17 +113,22 @@ def detect_decelerations(
     
     Algorithm:
         1. Find all regions where FHR < baseline - min_depth
-        2. Filter by duration (15 seconds to 10 minutes)
+        2. Filter by duration (12 seconds to 10 minutes) - Phase 13: relaxed from 15s
         3. Classify each deceleration by lag time
         4. Check for severity signs
+    
+    Phase 13 Changes:
+        - min_depth reduced: 12 bpm (was 15 bpm)
+        - min_duration reduced: 12 seconds (was 15 seconds)
+        - These changes improve detection under noisy conditions
     
     Args:
         fhr: FHR signal array in bpm.
         uc: Uterine contraction signal array.
         baseline: Baseline FHR value in bpm.
         sampling_rate: Sampling frequency in Hz (default: 4.0).
-        min_depth: Minimum depth below baseline in bpm (default: 15.0).
-        min_duration_seconds: Minimum duration in seconds (default: 15.0).
+        min_depth: Minimum depth below baseline in bpm (default: 12.0).
+        min_duration_seconds: Minimum duration in seconds (default: 12.0).
         max_duration_seconds: Maximum duration in seconds (default: 600.0).
         
     Returns:
@@ -264,7 +269,8 @@ def classify_deceleration(
     if len(uc_segment) == 0 or np.all(np.isnan(uc_segment)) or np.all(uc_segment == 0):
         # Cannot classify without contraction data
         # Use descent rate to distinguish Variable
-        if descent_rate > 0.5:  # Abrupt onset
+        # Phase 13: Reduced threshold from 0.5 to 0.3 for better sensitivity
+        if descent_rate > 0.3:  # Abrupt onset
             return DecelerationType.VARIABLE, 0.0, descent_rate
         return DecelerationType.UNCLASSIFIED, 0.0, descent_rate
     
@@ -278,19 +284,37 @@ def classify_deceleration(
     lag_seconds = lag_samples / sampling_rate
     
     # Classify based on lag and descent rate (per Section 5.3)
-    if descent_rate > 0.5:  # Abrupt onset characteristic of Variable
+    # Phase 13: Improved classification - considers both timing AND descent rate
+    # 
+    # Clinical reasoning:
+    #   - Late decels: gradual onset (descent_rate < 0.5), nadir >15s after contraction peak
+    #   - Variable decels: abrupt onset (descent_rate >= 0.5), variable timing
+    #   - Early decels: nadir coincides with contraction peak (head compression)
+    #
+    # Key insight: Variable decels are distinguished by their ABRUPT onset (>0.5 bpm/sample).
+    # Late decels have GRADUAL onset. Timing alone is not sufficient.
+    
+    # First, check for abrupt onset (hallmark of Variable decelerations)
+    VARIABLE_DESCENT_THRESHOLD = 0.5  # bpm/sample - clinical standard for "abrupt"
+    
+    if descent_rate >= VARIABLE_DESCENT_THRESHOLD:
+        # Abrupt onset → Variable, regardless of timing
         return DecelerationType.VARIABLE, lag_seconds, descent_rate
-    elif abs(lag_seconds) < 5:
-        # Nadir occurs within 5 seconds of contraction peak
+    
+    # Gradual onset - now classify by timing
+    if abs(lag_seconds) < 5:
+        # Nadir occurs within 5 seconds of contraction peak → Early
         return DecelerationType.EARLY, lag_seconds, descent_rate
     elif lag_seconds > 15:
-        # Nadir occurs more than 15 seconds after contraction peak
+        # Nadir occurs more than 15 seconds after contraction peak → Late
         return DecelerationType.LATE, lag_seconds, descent_rate
     else:
-        # In between - needs further analysis
-        # Check if it has variable characteristics
+        # Intermediate timing (5-15s) with gradual onset
+        # Could be Late with early nadir or atypical
         if descent_rate > 0.3:
+            # Moderately rapid → lean toward Variable
             return DecelerationType.VARIABLE, lag_seconds, descent_rate
+        # Gradual → lean toward Unclassified or Late
         return DecelerationType.UNCLASSIFIED, lag_seconds, descent_rate
 
 
@@ -331,7 +355,11 @@ def _calculate_descent_rate(
     """
     Calculate the rate of FHR descent (bpm per sample).
     
-    A rate > 0.5 bpm/sample indicates abrupt onset (Variable deceleration).
+    Phase 13: Uses robust calculation that handles jagged descents.
+    Instead of simple point-to-point, uses smoothed slope estimation.
+    
+    A rate > 0.3 bpm/sample indicates abrupt onset (Variable deceleration).
+    Phase 13: Threshold reduced from 0.5 to 0.3 for better sensitivity.
     
     Args:
         fhr: FHR signal array.
@@ -344,12 +372,25 @@ def _calculate_descent_rate(
     if nadir <= start:
         return 0.0
     
-    # Get values at start and nadir
-    start_val = fhr[start]
-    nadir_val = fhr[nadir]
+    # Get segment from start to nadir
+    segment = fhr[start:nadir+1]
+    valid_mask = ~np.isnan(segment)
     
-    if np.isnan(start_val) or np.isnan(nadir_val):
+    if np.sum(valid_mask) < 2:
         return 0.0
+    
+    # Phase 13: Use robust descent calculation
+    # Find valid start and nadir values (may not be at exact indices due to noise)
+    valid_indices = np.where(valid_mask)[0]
+    valid_values = segment[valid_mask]
+    
+    # Use 90th percentile of first 20% as "start" and 10th percentile as "nadir"
+    # This is more robust to noise/jaggedness
+    n_valid = len(valid_values)
+    first_portion = max(1, n_valid // 5)
+    
+    start_val = np.percentile(valid_values[:first_portion], 90) if first_portion > 0 else valid_values[0]
+    nadir_val = np.min(valid_values)  # True minimum
     
     drop = start_val - nadir_val
     samples = nadir - start
