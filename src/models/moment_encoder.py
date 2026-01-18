@@ -301,7 +301,7 @@ class MomentFeatureExtractor:
         
         # Inference
         with torch.no_grad():
-            output = self._model(x)
+            output = self._model.embed(x_enc=x)
             embedding = output.embeddings  # [1, 1024]
         
         return embedding.cpu().numpy().flatten()

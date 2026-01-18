@@ -1,0 +1,42 @@
+{
+  "timestamp": 1768519640.447446,
+  "duration_sec_per_stage": 60,
+  "stages": [
+    {
+      "patients": 1,
+      "cpu_mean": 19.29666666666667,
+      "cpu_p95": 25.36499999999998,
+      "ticks": 61,
+      "tick_rate_hz": 0.983901725779016,
+      "worst_tick_sec": 1.0163616688528907,
+      "lag": false
+    },
+    {
+      "patients": 2,
+      "cpu_mean": 19.298333333333332,
+      "cpu_p95": 21.564999999999998,
+      "ticks": 61,
+      "tick_rate_hz": 0.9839169166621881,
+      "worst_tick_sec": 1.0163459770489278,
+      "lag": false
+    },
+    {
+      "patients": 4,
+      "cpu_mean": 19.395,
+      "cpu_p95": 28.02,
+      "ticks": 61,
+      "tick_rate_hz": 0.98389812809143,
+      "worst_tick_sec": 1.0163653852455279,
+      "lag": false
+    },
+    {
+      "patients": 8,
+      "cpu_mean": 24.435,
+      "cpu_p95": 35.21999999999998,
+      "ticks": 61,
+      "tick_rate_hz": 0.9839326920617653,
+      "worst_tick_sec": 1.016329681966931,
+      "lag": false
+    }
+  ]
+}

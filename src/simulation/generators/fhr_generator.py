@@ -297,8 +297,8 @@ class FHRGenerator:
             # Sharp trapezoid shape (abrupt onset characteristic of variable)
             shape = np.ones_like(t_rel)
             
-            # Fast descent (first 5 seconds)
-            descent_time = 5.0
+            # Fast descent; parameterized to keep variable decels steeper than late decels
+            descent_time = getattr(params, "descent_time_seconds", 5.0)
             descent_mask = t_rel < descent_time
             if np.any(descent_mask):
                 shape[descent_mask] = t_rel[descent_mask] / descent_time

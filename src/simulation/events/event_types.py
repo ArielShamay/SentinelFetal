@@ -97,7 +97,7 @@ class LateDecelerationParams(EventParameters):
     def mild(cls) -> LateDecelerationParams:
         """Create mild late deceleration parameters."""
         return cls(
-            depth_bpm=20.0,
+            depth_bpm=22.0,
             lag_seconds=15.0,
             recovery_seconds=20.0,
             severity=EventSeverity.MILD,
@@ -150,6 +150,9 @@ class VariableDecelerationParams(EventParameters):
     depth_bpm: float = 40.0
     duration_decel_seconds: float = 45.0
     has_shoulders: bool = True
+
+    # Control descent slope to differentiate from gradual late decels
+    descent_time_seconds: float = 5.0
     
     # Severity signs (Category 3 indicators)
     drops_below_70: bool = False
@@ -164,6 +167,7 @@ class VariableDecelerationParams(EventParameters):
         return cls(
             depth_bpm=25.0,
             duration_decel_seconds=30.0,
+            descent_time_seconds=4.0,
             severity=EventSeverity.MILD,
             recurrence_rate=0.3
         )
@@ -174,6 +178,7 @@ class VariableDecelerationParams(EventParameters):
         return cls(
             depth_bpm=40.0,
             duration_decel_seconds=45.0,
+            descent_time_seconds=4.0,
             severity=EventSeverity.MODERATE,
             recurrence_rate=0.5
         )
@@ -184,6 +189,7 @@ class VariableDecelerationParams(EventParameters):
         return cls(
             depth_bpm=60.0,
             duration_decel_seconds=60.0,
+            descent_time_seconds=3.5,
             drops_below_70=True,
             slow_recovery=True,
             severity=EventSeverity.SEVERE,

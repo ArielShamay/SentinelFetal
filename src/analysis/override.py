@@ -42,6 +42,7 @@ class OverrideReason(Enum):
     SINUSOIDAL_PATTERN = auto()
     ABSENT_VARIABILITY_WITH_DECELS = auto()
     BRADYCARDIA = auto()
+    RECURRENT_LATE_DECELS = auto()
     ABSENT_VARIABILITY_SAFETY_FLOOR = auto()
 
 
@@ -191,6 +192,34 @@ def apply_medical_override(
                 "Sinusoidal pattern detected. This is a critical finding indicating "
                 "potential severe fetal anemia or compromise. Classification forced "
                 "to Category 3 (Pathological) regardless of ML prediction."
+            )
+        )
+
+    # Bradycardia alone warrants elevation to Category 2 for safety.
+    if _detect_bradycardia(baseline):
+        logger.warning("MEDICAL OVERRIDE: Bradycardia detected → Category 2")
+        return MedicalOverride(
+            should_override=True,
+            final_category=1,
+            reason=OverrideReason.BRADYCARDIA,
+            ml_prediction=ml_prediction,
+            explanation=(
+                "Baseline FHR < 110 bpm for ≥10 minutes consistent with bradycardia. "
+                "Classification elevated to Category 2."
+            )
+        )
+
+    # Recurrent late decelerations elevate to Category 2 even without absent variability.
+    if _has_recurrent_late_decels(decelerations):
+        logger.warning("MEDICAL OVERRIDE: Recurrent late decelerations → Category 2")
+        return MedicalOverride(
+            should_override=True,
+            final_category=1,
+            reason=OverrideReason.RECURRENT_LATE_DECELS,
+            ml_prediction=ml_prediction,
+            explanation=(
+                "Recurrent late decelerations detected (≥3 events). "
+                "Classification elevated to Category 2 to reflect increased risk."
             )
         )
     

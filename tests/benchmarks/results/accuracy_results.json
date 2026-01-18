@@ -1,0 +1,156 @@
+{
+  "timestamp": 1768519074.4699786,
+  "sampling_rate": 4.0,
+  "n_per_pattern": 20,
+  "results": {
+    "sinusoidal": {
+      "sensitivity": 1.0,
+      "n": 20,
+      "latency_mean_sec": null,
+      "latency_p95_sec": null,
+      "confusions": [],
+      "confidence_mean": 0.9882211834192276,
+      "confidence_std": 0.00016999614275997377
+    },
+    "late_mild": {
+      "sensitivity": 0.05,
+      "n": 20,
+      "latency_mean_sec": 1818.25,
+      "latency_p95_sec": 1818.25,
+      "confusions": [
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable"
+      ],
+      "confidence_mean": 0.9867560684680938,
+      "confidence_std": 0.006559393670908531
+    },
+    "late_moderate": {
+      "sensitivity": 0.75,
+      "n": 20,
+      "latency_mean_sec": 425.85,
+      "latency_p95_sec": 1124.6999999999996,
+      "confusions": [
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable",
+        "Variable"
+      ],
+      "confidence_mean": 0.9559919655323028,
+      "confidence_std": 0.007429815070343785
+    },
+    "late_severe": {
+      "sensitivity": 1.0,
+      "n": 20,
+      "latency_mean_sec": 142.6125,
+      "latency_p95_sec": 232.07500000000022,
+      "confusions": [],
+      "confidence_mean": 0.9607507348060608,
+      "confidence_std": 0.0010488126101165062
+    },
+    "variable_mild": {
+      "sensitivity": 0.9,
+      "n": 20,
+      "latency_mean_sec": 939.9166666666666,
+      "latency_p95_sec": 1567.9249999999995,
+      "confusions": [
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late"
+      ],
+      "confidence_mean": 0.9882314711809158,
+      "confidence_std": 0.00020333982587553072
+    },
+    "variable_moderate": {
+      "sensitivity": 0.95,
+      "n": 20,
+      "latency_mean_sec": 552.75,
+      "latency_p95_sec": 1420.3249999999991,
+      "confusions": [
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late"
+      ],
+      "confidence_mean": 0.957109147310257,
+      "confidence_std": 0.004618748291875497
+    },
+    "variable_severe": {
+      "sensitivity": 1.0,
+      "n": 20,
+      "latency_mean_sec": 285.9,
+      "latency_p95_sec": 848.2500000000003,
+      "confusions": [
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late",
+        "Late"
+      ],
+      "confidence_mean": 0.9546656519174576,
+      "confidence_std": 0.0064300672633539275
+    },
+    "prolonged": {
+      "sensitivity": 1.0,
+      "n": 20,
+      "latency_mean_sec": 12.4,
+      "latency_p95_sec": 22.0,
+      "confusions": [],
+      "confidence_mean": 0.9890466868877411,
+      "confidence_std": 0.00017386934783488397
+    },
+    "brady": {
+      "sensitivity": 1.0,
+      "n": 20,
+      "latency_mean_sec": null,
+      "latency_p95_sec": null,
+      "confusions": [],
+      "confidence_mean": 0.9890963077545166,
+      "confidence_std": 0.00018889777447496587
+    },
+    "tachy": {
+      "sensitivity": 1.0,
+      "n": 20,
+      "latency_mean_sec": null,
+      "latency_p95_sec": null,
+      "confusions": [],
+      "confidence_mean": 0.9438698023557663,
+      "confidence_std": 0.0007680473897587388
+    },
+    "normal": {
+      "sensitivity": 1.0,
+      "n": 20,
+      "latency_mean_sec": null,
+      "latency_p95_sec": null,
+      "confusions": [],
+      "confidence_mean": 0.9882672280073166,
+      "confidence_std": 0.0002012450466711993
+    }
+  }
+}

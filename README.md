@@ -118,62 +118,88 @@ print(f"Mean FHR: {result.stats['mean_fhr']:.1f} bpm")
 ```python
 from src.rules import (
     calculate_baseline,
-    calculate_variability,
-    detect_decelerations,
-    detect_tachysystole,
-    detect_sinusoidal_pattern
-)
+    <div align="center">
 
-# Calculate baseline
-baseline = calculate_baseline(fhr, sampling_rate=4.0)
-print(f"Baseline: {baseline.value} bpm")
+    # SentinelFetal
 
-# Analyze variability
-variability = calculate_variability(fhr, baseline.value)
-print(f"Variability: {variability.category.name}")
+    [![Python](https://img.shields.io/badge/Python-3.9-blue)](https://www.python.org/)  
+    [![AI](https://img.shields.io/badge/Hybrid-AI%20%2B%20Rules-8A2BE2)](#)  
+    [![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B)](https://streamlit.io/)  
+    [![PyTorch](https://img.shields.io/badge/PyTorch-Model%20Backbone-EE4C2C)](https://pytorch.org/)
 
-# Detect decelerations
-decelerations = detect_decelerations(fhr, uc, baseline.value)
-for decel in decelerations:
-    print(f"{decel.type.name} deceleration: depth={decel.depth_bpm} bpm")
+    </div>
 
-# Check for sinusoidal pattern (SEVERE)
-sinusoidal = detect_sinusoidal_pattern(fhr)
-if sinusoidal.detected:
-    print("⚠️ SEVERE: Sinusoidal pattern detected - Category 3!")
-```
-
----
-
-## 🧪 Testing
-
-The project includes 26 comprehensive unit tests covering all rule engine modules:
-
-```bash
-# Run all tests
-pytest tests/ -v
-
-# Run specific test module
-pytest tests/test_rules.py -v
-
-# Run with coverage
-pytest tests/ --cov=src --cov-report=html
-```
-
-**Test Coverage:**
-- ✅ Baseline calculation (6 tests)
-- ✅ Variability analysis (5 tests)
-- ✅ Deceleration detection (5 tests)
-- ✅ Tachysystole detection (3 tests)
-- ✅ Sinusoidal pattern detection (5 tests)
-- ✅ Integration tests (2 tests)
-
----
-
-## 📁 Project Structure
-
-```
 SentinelFetal/
+    SentinelFetal is a real-time fetal distress detection platform for CTG (FHR + UC) that fuses a clinical rule engine with foundation-model embeddings:
+    - **Hybrid AI:** MOMENT embeddings (1024-dim) + rule features (11-dim) fused into a 1035-dim vector for XGBoost.
+    - **Safety Net:** Medical overrides enforce critical findings (sinusoidal, bradycardia, recurrent lates) regardless of ML output.
+    - **Real-Time Simulation:** Up to 8 concurrent synthetic patients with event injection, ring buffer, and staggered processing.
+    - **Streamlit Dashboards:** Hebrew/English alerts, trend plots, and a training/demo simulator.
+
+    ## Installation & Setup
+    ```bash
+    py -m venv .venv
+    .\.venv\Scripts\activate           # PowerShell
+    pip install -r requirements.txt
+    set PYTHONPATH=.
+    ```
+
+    ## How to Run
+    - **Simulation Dashboard (multi-patient):**
+      ```bash
+      py scripts/run_simulation.py
+      ```
+    - **Main Dashboard (analysis/plots):**
+      ```bash
+      streamlit run src/ui/app.py
+      ```
+    - **Verify environment:**
+      ```bash
+      py scripts/verify_system.py
+      ```
+
+    ## Architecture (Hybrid Pipeline)
+    ```mermaid
+    flowchart TD
+       A[CTG Signal (FHR+UC)] --> B[Preprocess]
+       A --> C[MOMENT Embeddings]
+       A --> D[Rule Engine]
+       B --> E[Fusion 1035-dim]
+       C --> E
+       D --> E
+       E --> F[XGBoost Classifier]
+       F --> G[Medical Override Safety Net]
+       G --> H[Alerts + XAI]
+    ```
+
+    ## Project Structure (abridged)
+    ```
+    SentinelFetal/
+    ├─ src/
+    │  ├─ pipeline/        # DI container + AnalysisPipeline
+    │  ├─ analysis/        # Alerts, overrides
+    │  ├─ rules/           # Baseline, variability, decels, sinusoidal
+    │  ├─ simulation/      # Orchestrator, generators, events
+    │  ├─ models/          # MOMENT encoder, XGBoost wrapper
+    │  ├─ ui/              # Streamlit apps
+    │  └─ utils/           # Signal utilities
+    ├─ scripts/            # run_simulation.py, verify_system.py, etc.
+    ├─ tests/              # Unit + integration + benchmarks
+    ├─ docs/               # Specs, PRDs, evaluation reports
+    └─ models/             # Saved demo model + config
+    ```
+
+    ## Phase Highlights
+    - **Hybrid AI:** Rules + MOMENT embeddings with XGBoost classifier.
+    - **Safety Overrides:** Sinusoidal → Cat 3; brady/recurrent lates → Cat 2 safety floor.
+    - **Simulation:** 8-patient orchestrator with event injection and Streamlit dashboards.
+    - **Benchmarks:** Phase C clinical validation passes (sinusoidal/late severe/brady → elevated categories, normal → Cat 1).
+
+    ## Full Documentation
+    See the master reference: [SENTINEL_FETAL_MASTER_DOC.md](SENTINEL_FETAL_MASTER_DOC.md)
+
+    ## License
+    Proprietary / internal use. Contact project owners for redistribution terms.
 ├── data/                           # Dataset storage
 │   └── ctu-chb.../                # CTU-UHB database
 ├── docs/                           # Documentation

@@ -248,12 +248,16 @@ class SimulationOrchestrator:
                 self.config.tick_interval_seconds / self._speed_multiplier
             )
             
+            # Catch up if we fell behind to avoid cumulative drift.
             if elapsed >= target_interval:
-                self._tick()
-                last_tick = current_time
+                while elapsed >= target_interval and self._running and not self._paused:
+                    self._tick()
+                    last_tick += target_interval
+                    elapsed = time.time() - last_tick
             else:
-                # Sleep for a short time to prevent busy-waiting
-                time.sleep(0.01)
+                # Sleep slightly less than the remaining interval to stay ahead of drift.
+                sleep_time = max(0.005, target_interval - elapsed - 0.002)
+                time.sleep(sleep_time)
     
     def _tick(self) -> None:
         """
