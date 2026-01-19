@@ -14,9 +14,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Fix encoding for Windows console
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+# Fix encoding for Windows console without replacing stdout (avoids closed-file errors)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
 def main():
