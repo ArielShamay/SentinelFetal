@@ -104,7 +104,7 @@ class PipelineContainer:
     def create_default(
         cls,
         use_mock_moment: bool = False,
-        model_path: str = "models/xgb_demo.json"
+        model_path: str = "models/sentinel_classifier.json"
     ) -> 'PipelineContainer':
         """
         Create container with default implementations.

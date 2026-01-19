@@ -159,7 +159,7 @@ class ModelConfig:
     CLASS_NAMES: tuple = ('Normal (Cat 1)', 'Intermediate (Cat 2)', 'Pathological (Cat 3)')
     
     # Model Paths
-    DEFAULT_MODEL_PATH: str = 'models/xgb_demo.json'
+    DEFAULT_MODEL_PATH: str = 'models/sentinel_classifier.json'
 
 
 MODEL: Final[ModelConfig] = ModelConfig()
@@ -178,7 +178,7 @@ class DataPaths:
     X_PATH: str = 'data/processed/X.npy'
     Y_PATH: str = 'data/processed/y.npy'
     MODELS_DIR: str = 'models'
-    DEFAULT_MODEL_PATH: str = 'models/xgb_demo.json'
+    DEFAULT_MODEL_PATH: str = 'models/sentinel_classifier.json'
 
 
 PATHS: Final[DataPaths] = DataPaths()

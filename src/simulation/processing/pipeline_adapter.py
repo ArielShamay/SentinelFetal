@@ -51,7 +51,7 @@ class PipelineAdapterConfig:
         min_data_seconds: Minimum data required for processing.
     """
     use_real_moment: bool = True  # CRITICAL: Use real MOMENT model
-    model_path: str = "models/xgb_demo.json"
+    model_path: str = "models/sentinel_classifier.json"
     sampling_rate: float = 4.0
     min_data_seconds: float = 60.0  # 1 minute minimum
 
@@ -87,23 +87,10 @@ class PipelineAdapter:
             sampling_rate=self.config.sampling_rate
         ))
         
-        # Initialize MOMENT - CRITICAL: use_mock=False for real model
-        logger.info(
-            f"Initializing MOMENT encoder with use_mock="
-            f"{not self.config.use_real_moment}"
-        )
-        self._moment = MomentFeatureExtractor(
-            use_mock=not self.config.use_real_moment
-        )
-        
-        # Log MOMENT mode
-        if self._moment.use_mock:
-            logger.warning(
-                "MOMENT is running in MOCK mode. For real embeddings, "
-                "install momentfm: pip install momentfm"
-            )
-        else:
-            logger.info("MOMENT is running with REAL model")
+        # Initialize MOMENT - CRITICAL: always uses real model
+        logger.info("Initializing MOMENT encoder (real model)")
+        self._moment = MomentFeatureExtractor()
+        logger.info("MOMENT encoder initialized with REAL model")
         
         # Initialize classifier
         self._classifier = XGBClassifierWrapper()

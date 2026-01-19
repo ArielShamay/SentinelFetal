@@ -63,7 +63,7 @@ def get_pipeline_adapter() -> PipelineAdapter:
     """
     config = PipelineAdapterConfig(
         use_real_moment=True,  # Use REAL MOMENT model
-        model_path="models/xgb_demo.json"
+        model_path="models/sentinel_classifier.json"
     )
     return PipelineAdapter(config)
 
