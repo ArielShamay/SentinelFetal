@@ -40,7 +40,7 @@ COLORS = {
 
     # Text - Pure black for maximum readability
     'text_primary': '#000000',
-    'text_secondary': '#333333',
+    'text_secondary': "#2F2C2C",
     'text_muted': '#666666',
 
     # Category colors (semantic only)
@@ -51,18 +51,18 @@ COLORS = {
     'category_3': '#dc3545',  # Red - Pathological
     'category_3_light': '#f8d7da',
 
-    # Accent - Subtle black
-    'accent': '#000000',
+    # Accent - Red instead of black
+    'accent': '#DC3545',
     'accent_light': '#f5f5f5',
 
     # Borders - Light gray
     'border': '#E5E5E5',
     'border_dark': '#CCCCCC',
 
-    # Legacy compatibility (some code may reference these)
-    'primary': '#000000',
+    # Legacy compatibility (some code may reference these) - Red
+    'primary': '#DC3545',
     'primary_light': '#333333',
-    'primary_dark': '#000000',
+    'primary_dark': '#DC3545',
     'background_dark': '#F5F5F5',
 }
 
@@ -385,26 +385,45 @@ def get_alert_css() -> str:
 
         /* Hide large st.error/warning/success banners - use colored text instead */
         .stAlert {{
-            background-color: transparent !important;
-            border: none !important;
-            padding: 0.25rem 0 !important;
+            background-color: #FFFFFF !important;
+            border: 1px solid {COLORS['border']} !important;
+            padding: 0.75rem 1rem !important;
+            border-radius: 4px !important;
+            box-shadow: none !important;
         }}
 
-        /* Category colored text */
-        .text-normal {{ color: {COLORS['category_1']} !important; }}
-        .text-warning {{ color: {COLORS['category_2']} !important; }}
-        .text-critical {{ color: {COLORS['category_3']} !important; }}
+        /* Category colored text for alerts */
+        .stAlert [data-testid="stAlert"] {{
+            color: inherit !important;
+        }}
+
+        /* Specific alert colors */
+        .stAlert-success {{
+            color: {COLORS['category_1']} !important;
+        }}
+
+        .stAlert-warning {{
+            color: {COLORS['category_2']} !important;
+        }}
+
+        .stAlert-error {{
+            color: {COLORS['category_3']} !important;
+        }}
+
+        .stAlert-info {{
+            color: {COLORS['text_primary']} !important;
+        }}
     """
 
 
 def get_button_css() -> str:
     """CSS for button styling - Clinical Minimalism (black/white)."""
     return f"""
-        /* Primary buttons - black on white */
+        /* Primary buttons - red on white */
         .stButton > button {{
-            background-color: {COLORS['text_primary']};
+            background-color: {COLORS['accent']};
             color: {COLORS['background']};
-            border: 1px solid {COLORS['text_primary']};
+            border: 1px solid {COLORS['accent']};
             border-radius: 4px;
             padding: 0.5rem 1rem;
             font-weight: 500;
@@ -413,12 +432,12 @@ def get_button_css() -> str:
 
         .stButton > button:hover {{
             background-color: {COLORS['background']};
-            color: {COLORS['text_primary']};
+            color: {COLORS['accent']};
         }}
 
         /* Download button */
         .stDownloadButton > button {{
-            background-color: {COLORS['text_primary']};
+            background-color: {COLORS['accent']};
             color: {COLORS['background']};
         }}
 
