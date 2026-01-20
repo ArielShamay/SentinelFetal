@@ -293,8 +293,8 @@ class LaunchReadinessAudit:
             
             for patient_id, generator in self.generators.items():
                 try:
-                    # Generate next second of data
-                    sample = generator.generate(duration_sec=1.0)
+                    # Generate next second of data (4 samples at 4Hz)
+                    sample = generator.generate_tick(n_samples=4)
                     
                     # Process through pipeline
                     inf_start = time.time()
