@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 SentinelFetal - Multi-Patient Simulation Dashboard (Clinical Minimalism).
 
@@ -24,6 +25,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from src.ui.plots import (
+    create_ctg_plot,
     create_patient_detail_plot,
     create_patient_sparkline,
 )
@@ -400,72 +402,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-        f"""
-        <div style="background-color: {color}; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-            <h2 style="color: white; margin: 0;">{emoji} {alert.headline}</h2>
-            <p style="color: white; margin: 5px 0 0 0;">רשומה: {record_id} | ביטחון: {results['confidence']:.1%}</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    
-    # Two columns: Graph and Findings
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.subheader("📊 גרף CTG")
-        fig = create_ctg_plot(
-            fhr=results['fhr'],
-            uc=results['uc'],
-            decelerations=results['decelerations'],
-            sampling_rate=SAMPLING_RATE,
-            title=f"ניטור מיטה {record_id}"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        # Findings panel
-        st.subheader("🔍 ממצאים")
-        for finding in alert.findings:
-            st.write(f"• {finding}")
-        
-        st.markdown("---")
-        
-        # Recommendations panel
-        st.subheader("💡 המלצות")
-        for rec in alert.recommendations:
-            if category == 3:
-                st.error(f"• {rec}")
-            elif category == 2:
-                st.warning(f"• {rec}")
-            else:
-                st.success(f"• {rec}")
-        
-        st.markdown("---")
-        
-        # Explanation
-        st.subheader("📝 הסבר")
-        st.write(alert.explanation)
-    
-    # Technical details (expandable)
-    with st.expander("🔧 פרטים טכניים"):
-        col_a, col_b, col_c = st.columns(3)
-        
-        with col_a:
-            st.metric("Baseline", f"{results['baseline'].value:.0f} bpm")
-            st.metric("שונות", f"{results['variability'].value:.1f} bpm")
-        
-        with col_b:
-            st.metric("קטגוריית שונות", results['variability'].category.name)
-            late_count = sum(1 for d in results['decelerations'] 
-                           if d.decel_type == DecelerationType.LATE)
-            st.metric("האטות מאוחרות", late_count)
-        
-        with col_c:
-            variable_count = sum(1 for d in results['decelerations'] 
-                               if d.decel_type == DecelerationType.VARIABLE)
-            st.metric("האטות משתנות", variable_count)
-            st.metric("סה״כ האטות", len(results['decelerations']))
 
 
 def render_no_model_warning():

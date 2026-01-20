@@ -1,18 +1,19 @@
+# -*- coding: utf-8 -*-
 """
-SentinelFetal Simulation Dashboard - Real-Time CTG Simulator UI.
+SentinelFetal Simulation Dashboard - Clinical Minimalism UI.
 
-This Streamlit application provides a visual interface for the real-time
-CTG simulation system. It allows users to:
-- Control simulation (start/stop/pause/reset)
-- View 8 simulated patients in real-time
-- Inject clinical events for training scenarios
-- See live CTG plots and AI-generated alerts
+Two-view architecture:
+- Ward View (Grid): All patient monitors side-by-side
+- Detail View: Single patient focus with full analysis
+
+Design principles:
+- White background (#FFFFFF)
+- Black text (#000000)
+- No large alert banners - use colored indicators
+- 1-20 dynamic patient population
 
 Usage:
     streamlit run src/ui/simulation_app.py
-
-References:
-    SentinelFetal Real-Time Simulator SPEC Part 2, Section 9
 """
 
 from __future__ import annotations
@@ -20,12 +21,11 @@ from __future__ import annotations
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 # Add src to path for imports
 src_path = Path(__file__).parent.parent.parent
@@ -50,51 +50,15 @@ from src.ui.plots import create_ctg_plot
 
 
 # =============================================================================
-# Cached Resources (Persist across refreshes)
+# Constants
 # =============================================================================
 
-@st.cache_resource
-def get_pipeline_adapter() -> PipelineAdapter:
-    """
-    Get or create the pipeline adapter.
-    
-    Uses st.cache_resource to persist across refreshes.
-    CRITICAL: Uses real MOMENT model (use_mock=False by default).
-    """
-    config = PipelineAdapterConfig(
-        use_real_moment=True,  # Use REAL MOMENT model
-        model_path="models/sentinel_classifier.json"
-    )
-    return PipelineAdapter(config)
+DEFAULT_REFRESH_FPS = 3
+REFRESH_FPS_OPTIONS = (2, 3, 4, 5)
+DEFAULT_PATIENT_COUNT = 8
+MAX_PATIENT_COUNT = 20
 
-
-@st.cache_resource
-def get_orchestrator() -> SimulationOrchestrator:
-    """
-    Get or create the simulation orchestrator.
-    
-    Uses st.cache_resource to persist across refreshes.
-    """
-    adapter = get_pipeline_adapter()
-    
-    def processing_callback(patient_id: str, data: Dict) -> Dict:
-        """Callback for processing patient data through the AI pipeline."""
-        return adapter.process_patient(patient_id, data, run_moment=True)
-    
-    config = OrchestratorConfig(
-        num_patients=8,
-        sampling_rate=4.0,
-        tick_interval_seconds=1.0,
-        moment_interval_seconds=30.0  # Process each patient's MOMENT every 30s total
-    )
-    
-    return SimulationOrchestrator(config, processing_callback)
-
-
-# =============================================================================
-# Event Parameter Helpers
-# =============================================================================
-
+# Event options with Hebrew and English
 EVENT_OPTIONS = {
     "האטות מאוחרות (Late Decels)": EventType.LATE_DECELERATION,
     "האטות משתנות (Variable Decels)": EventType.VARIABLE_DECELERATION,
@@ -106,22 +70,87 @@ EVENT_OPTIONS = {
     "טכיסיסטולה (Tachysystole)": EventType.TACHYSYSTOLE,
 }
 
-SEVERITY_MAP = {"קל (Mild)": "mild", "בינוני (Moderate)": "moderate", "חמור (Severe)": "severe"}
+SEVERITY_MAP = {
+    "קל (Mild)": "mild",
+    "בינוני (Moderate)": "moderate",
+    "חמור (Severe)": "severe"
+}
 
+# Expected detection times for events (in seconds)
+EXPECTED_DETECTION_TIMES = {
+    EventType.LATE_DECELERATION: "10-15s",
+    EventType.VARIABLE_DECELERATION: "10-15s",
+    EventType.BRADYCARDIA: "~10s",
+    EventType.TACHYCARDIA: "~10s",
+    EventType.ABSENT_VARIABILITY: "30-60s",
+    EventType.MINIMAL_VARIABILITY: "30-60s",
+    EventType.SINUSOIDAL_PATTERN: "20-40s",
+    EventType.TACHYSYSTOLE: "15-30s",
+}
+
+# Category colors and labels
+CAT_COLORS = {1: "#28a745", 2: "#fd7e14", 3: "#dc3545"}
+CAT_DOTS = {1: "🟢", 2: "🟠", 3: "🔴"}
+CAT_LABELS = {1: "Normal", 2: "Intermediate", 3: "Pathological"}
+CAT_LABELS_HE = {1: "תקין", 2: "ביניים", 3: "פתולוגי"}
+
+
+# =============================================================================
+# Cached Resources
+# =============================================================================
+
+@st.cache_resource
+def get_pipeline_adapter() -> PipelineAdapter:
+    """Get or create the pipeline adapter (persists across refreshes)."""
+    config = PipelineAdapterConfig(
+        use_real_moment=True,
+        model_path="models/sentinel_classifier.json"
+    )
+    return PipelineAdapter(config)
+
+
+@st.cache_resource
+def get_orchestrator(_patient_count: int = DEFAULT_PATIENT_COUNT) -> SimulationOrchestrator:
+    """Get or create the simulation orchestrator."""
+    adapter = get_pipeline_adapter()
+
+    def processing_callback(patient_id: str, data: Dict) -> Dict:
+        return adapter.process_patient(patient_id, data, run_moment=True)
+
+    config = OrchestratorConfig(
+        num_patients=_patient_count,
+        sampling_rate=4.0,
+        tick_interval_seconds=1.0,
+        moment_interval_seconds=30.0
+    )
+
+    return SimulationOrchestrator(config, processing_callback)
+
+
+# =============================================================================
+# Session State Initialization
+# =============================================================================
+
+def init_session_state():
+    """Initialize all session state variables."""
+    if 'current_view' not in st.session_state:
+        st.session_state.current_view = "grid"  # "grid" or patient_id
+    if 'selected_patient' not in st.session_state:
+        st.session_state.selected_patient = None
+    if 'patient_count' not in st.session_state:
+        st.session_state.patient_count = DEFAULT_PATIENT_COUNT
+    if 'refresh_fps' not in st.session_state:
+        st.session_state.refresh_fps = DEFAULT_REFRESH_FPS
+
+
+# =============================================================================
+# Event Parameter Helpers
+# =============================================================================
 
 def get_event_params(event_type: EventType, severity: str):
-    """
-    Get event parameters based on type and severity.
-    
-    Args:
-        event_type: The type of event to inject.
-        severity: Severity level in Hebrew.
-        
-    Returns:
-        EventParameters instance for the event.
-    """
+    """Get event parameters based on type and severity."""
     sev = SEVERITY_MAP.get(severity, "moderate")
-    
+
     if event_type == EventType.LATE_DECELERATION:
         return getattr(LateDecelerationParams, sev)()
     elif event_type == EventType.VARIABLE_DECELERATION:
@@ -138,481 +167,582 @@ def get_event_params(event_type: EventType, severity: str):
         return SinusoidalParams()
     elif event_type == EventType.TACHYSYSTOLE:
         return TachysystoleParams.mild() if sev == "mild" else TachysystoleParams.severe()
-    
+
     return VariabilityParams.minimal()
 
 
 # =============================================================================
-# UI Components
+# CSS Injection - Clinical Minimalism
 # =============================================================================
 
-def render_header():
-    """Render the application header."""
+def inject_clinical_css():
+    """Inject clean, clinical CSS - white background, black text."""
     st.markdown("""
     <style>
-        .main-header {
-            font-size: 2.5rem;
-            font-weight: bold;
-            text-align: center;
-            padding: 1rem;
-            background: linear-gradient(90deg, #1E90FF, #FF8C00);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        /* White background everywhere */
+        .stApp, .main, .block-container {
+            background-color: #FFFFFF !important;
         }
-        .sub-header {
-            text-align: center;
-            color: #666;
-            font-size: 1rem;
+
+        /* Black text */
+        h1, h2, h3, h4, h5, h6, p, span, div, label {
+            color: #000000 !important;
+        }
+
+        /* Clean header */
+        .main-header {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #000000;
+            text-align: left;
+            padding: 0.5rem 0;
+            border-bottom: 2px solid #000000;
             margin-bottom: 1rem;
         }
+
+        /* Patient cards */
         .patient-card {
-            padding: 10px;
-            border-radius: 8px;
-            margin: 5px 0;
+            background: #FFFFFF;
+            border: 1px solid #E5E5E5;
+            border-radius: 6px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
             cursor: pointer;
+            transition: border-color 0.15s;
         }
-        .cat-1 { background-color: rgba(40, 167, 69, 0.2); border-left: 4px solid #28a745; }
-        .cat-2 { background-color: rgba(253, 126, 20, 0.2); border-left: 4px solid #fd7e14; }
-        .cat-3 { background-color: rgba(220, 53, 69, 0.2); border-left: 4px solid #dc3545; }
+        .patient-card:hover {
+            border-color: #000000;
+        }
+
+        /* Category border colors */
+        .cat-1 { border-left: 4px solid #28a745; }
+        .cat-2 { border-left: 4px solid #fd7e14; }
+        .cat-3 { border-left: 4px solid #dc3545; }
+
+        /* Control bar */
+        .control-bar {
+            background: #F5F5F5;
+            border: 1px solid #E5E5E5;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Status indicator */
+        .status-running { color: #28a745; font-weight: 600; }
+        .status-paused { color: #fd7e14; font-weight: 600; }
+        .status-stopped { color: #666666; font-weight: 600; }
+
+        /* Hide Streamlit chrome */
+        header[data-testid="stHeader"] { display: none !important; }
+        footer { display: none !important; }
+        #MainMenu { display: none !important; }
+
+        /* Clean metrics */
+        [data-testid="stMetric"] {
+            background: #FFFFFF;
+            border: 1px solid #E5E5E5;
+            border-radius: 4px;
+            padding: 0.5rem;
+        }
+
+        /* Minimal alerts */
+        .stAlert {
+            background: transparent !important;
+            border: none !important;
+            padding: 0.25rem 0 !important;
+        }
+
+        /* Back button styling */
+        .back-btn {
+            background: #FFFFFF !important;
+            color: #000000 !important;
+            border: 1px solid #000000 !important;
+        }
     </style>
     """, unsafe_allow_html=True)
-    
-    st.markdown('<h1 class="main-header">🏥 SentinelFetal Simulator</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">סימולציית זמן אמת למעקב עוברי | Real-Time CTG Simulation</p>', 
-                unsafe_allow_html=True)
 
 
-def render_control_panel(orchestrator: SimulationOrchestrator):
-    """Render the simulation control panel."""
-    st.markdown("### 🎛️ לוח בקרה | Control Panel")
-    
-    col1, col2, col3, col4, col5 = st.columns([2, 2, 1, 1, 2])
-    
+# =============================================================================
+# Control Bar Component
+# =============================================================================
+
+def render_control_bar(orchestrator: SimulationOrchestrator):
+    """Render the simulation control bar at the top."""
+    st.markdown("### Control Panel | לוח בקרה")
+
+    # Row 1: Population, Controls, Status
+    col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+
     with col1:
-        if orchestrator._running and not orchestrator._paused:
-            status_text = "▶️ פעיל | Running"
-            status_color = "green"
-        elif orchestrator._paused:
-            status_text = "⏸️ מושהה | Paused"
-            status_color = "orange"
-        else:
-            status_text = "⏹️ עצור | Stopped"
-            status_color = "gray"
-        
-        st.markdown(f"**סטטוס:** <span style='color:{status_color}'>{status_text}</span>",
-                    unsafe_allow_html=True)
-        st.markdown(f"**זמן סימולציה:** {orchestrator.get_simulation_time_formatted()}")
-    
+        # Population slider
+        new_count = st.slider(
+            "Population | מספר יולדות",
+            min_value=1,
+            max_value=MAX_PATIENT_COUNT,
+            value=st.session_state.patient_count,
+            key="pop_slider",
+            help="Generate 1-20 synthetic patients"
+        )
+        if new_count != st.session_state.patient_count:
+            st.session_state.patient_count = new_count
+            orchestrator.set_patient_count(new_count)
+            st.rerun()
+
     with col2:
-        stats = orchestrator.get_statistics()
-        st.markdown(f"**Ticks:** {stats['tick_count']}")
-        st.markdown(f"**MOMENT Processes:** {stats['moment_process_count']}")
-    
-    with col3:
+        # Start/Resume button
         if not orchestrator._running:
-            if st.button("▶️ התחל", key="start_btn", use_container_width=True):
+            if st.button("▶ Start", key="start_btn", use_container_width=True):
                 orchestrator.start()
                 st.rerun()
+        elif orchestrator._paused:
+            if st.button("▶ Resume", key="resume_btn", use_container_width=True):
+                orchestrator.resume()
+                st.rerun()
         else:
-            if orchestrator._paused:
-                if st.button("▶️ המשך", key="resume_btn", use_container_width=True):
-                    orchestrator.resume()
-                    st.rerun()
-            else:
-                if st.button("⏸️ השהה", key="pause_btn", use_container_width=True):
-                    orchestrator.pause()
-                    st.rerun()
-    
-    with col4:
-        if st.button("🔄 אפס", key="reset_btn", use_container_width=True):
+            if st.button("⏸ Pause", key="pause_btn", use_container_width=True):
+                orchestrator.pause()
+                st.rerun()
+
+    with col3:
+        # Stop/Reset button
+        if st.button("⏹ Reset", key="reset_btn", use_container_width=True):
             orchestrator.stop()
             orchestrator.reset_all()
             st.rerun()
-    
-    with col5:
-        speed = st.select_slider(
-            "מהירות | Speed",
-            options=[0.5, 1.0, 2.0],
-            value=orchestrator._speed_multiplier,
-            key="speed_slider"
-        )
-        if speed != orchestrator._speed_multiplier:
-            orchestrator.set_speed(speed)
 
+    with col4:
+        # Status display
+        if orchestrator._running and not orchestrator._paused:
+            st.markdown('<p class="status-running">● Running</p>', unsafe_allow_html=True)
+        elif orchestrator._paused:
+            st.markdown('<p class="status-paused">● Paused</p>', unsafe_allow_html=True)
+        else:
+            st.markdown('<p class="status-stopped">○ Stopped</p>', unsafe_allow_html=True)
+        st.caption(f"Time: {orchestrator.get_simulation_time_formatted()}")
+
+    with col5:
+        # Speed and FPS controls
+        sub1, sub2 = st.columns(2)
+        with sub1:
+            speed = st.select_slider(
+                "Speed",
+                options=[0.5, 1.0, 2.0],
+                value=orchestrator._speed_multiplier,
+                key="speed_slider"
+            )
+            if speed != orchestrator._speed_multiplier:
+                orchestrator.set_speed(speed)
+        with sub2:
+            fps = st.select_slider(
+                "FPS",
+                options=list(REFRESH_FPS_OPTIONS),
+                value=st.session_state.refresh_fps,
+                key="fps_slider"
+            )
+            st.session_state.refresh_fps = fps
+
+
+# =============================================================================
+# Event Injection Component
+# =============================================================================
 
 def render_event_injection(orchestrator: SimulationOrchestrator):
     """Render the event injection panel."""
-    st.markdown("### 💉 הזרקת אירוע | Event Injection")
-    
-    col1, col2, col3, col4, col5 = st.columns([1.5, 2, 1.5, 1, 1])
-    
-    with col1:
-        patients = [f"P{i+1}" for i in range(8)]
-        target_patient = st.selectbox("יולדת | Patient", patients, key="inject_patient")
-    
-    with col2:
-        event_name = st.selectbox("סוג אירוע | Event Type", 
-                                   list(EVENT_OPTIONS.keys()), 
-                                   key="inject_event")
-    
-    with col3:
-        severity = st.selectbox("חומרה | Severity", 
-                                 list(SEVERITY_MAP.keys()), 
-                                 key="inject_severity")
-    
-    with col4:
-        duration = st.number_input("דקות | Duration", 
-                                    min_value=1, max_value=20, value=5,
-                                    key="inject_duration")
-    
-    with col5:
-        st.markdown("<br>", unsafe_allow_html=True)  # Spacer
-        if st.button("💉 הזרק", key="inject_btn", type="primary", use_container_width=True):
+    with st.expander("💉 Event Injection | הזרקת אירוע", expanded=False):
+        col1, col2, col3, col4, col5, col6 = st.columns([1.5, 2, 1.5, 1, 1, 1.5])
+
+        num_patients = orchestrator.config.num_patients
+        patients = [f"P{i+1}" for i in range(num_patients)]
+
+        with col1:
+            target_patient = st.selectbox("Patient", patients, key="inject_patient")
+
+        with col2:
+            event_name = st.selectbox("Event Type", list(EVENT_OPTIONS.keys()), key="inject_event")
             event_type = EVENT_OPTIONS[event_name]
-            params = get_event_params(event_type, severity)
-            orchestrator.inject_event(target_patient, event_type, params, duration * 60)
-            st.success(f"✅ הוזרק: {event_name} → {target_patient}")
-            time.sleep(0.5)
-            st.rerun()
+
+        with col3:
+            severity = st.selectbox("Severity", list(SEVERITY_MAP.keys()), key="inject_severity")
+
+        with col4:
+            duration = st.number_input("Min", min_value=1, max_value=20, value=5, key="inject_duration")
+
+        with col5:
+            # Expected detection time display
+            detection_time = EXPECTED_DETECTION_TIMES.get(event_type, "~15s")
+            st.metric("Detection", detection_time)
+
+        with col6:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Inject", key="inject_btn", type="primary", use_container_width=True):
+                params = get_event_params(event_type, severity)
+                orchestrator.inject_event(target_patient, event_type, params, duration * 60)
+                st.toast(f"✅ Injected: {event_name} → {target_patient}")
 
 
-def render_patient_overview(orchestrator: SimulationOrchestrator):
-    """Render the patient overview grid."""
-    st.markdown("### 👥 סקירת יולדות | Patient Overview")
+# =============================================================================
+# Ward/Grid View - Staggered Updates for Performance
+# =============================================================================
+
+def render_ward_view(orchestrator: SimulationOrchestrator):
+    """
+    Render the Ward view - all patient monitors in a grid.
     
+    Uses staggered update pattern to prevent browser freeze with 20 patients.
+    Each patient tile updates at a slightly different offset to distribute load.
+    """
+    st.markdown("### Ward View | תצוגת חדר לידה")
+
     statuses = orchestrator.get_all_patients_status()
+    num_patients = len(statuses)
+
+    # Dynamic columns (max 4 per row)
+    n_cols = min(4, num_patients)
+    n_rows = (num_patients + n_cols - 1) // n_cols
+
+    for row_idx in range(n_rows):
+        cols = st.columns(n_cols)
+        for col_idx in range(n_cols):
+            patient_idx = row_idx * n_cols + col_idx
+            if patient_idx < num_patients:
+                with cols[col_idx]:
+                    # Staggered update: each patient gets a different refresh offset
+                    # Pattern: 0.5s base + (patient_idx % 5) * 0.1s offset
+                    # This distributes 20 patients across 5 update groups
+                    render_ward_card_staggered(
+                        statuses[patient_idx], 
+                        orchestrator,
+                        patient_idx,
+                        num_patients
+                    )
+
+
+def render_ward_card_staggered(
+    status: Dict[str, Any], 
+    orchestrator: SimulationOrchestrator,
+    patient_idx: int,
+    total_patients: int
+):
+    """
+    Render a single patient card with staggered refresh for performance.
     
-    # Create 2 rows of 4 patients each
-    for row in range(2):
-        cols = st.columns(4)
-        for col_idx, col in enumerate(cols):
-            patient_idx = row * 4 + col_idx
-            if patient_idx < len(statuses):
-                status = statuses[patient_idx]
-                with col:
-                    render_patient_card(status, orchestrator)
-
-
-def render_patient_card(status: Dict[str, Any], orchestrator: SimulationOrchestrator):
-    """Render a single patient card in the overview grid."""
-    cat = status['category']
+    Staggered pattern prevents all 20 patients from updating simultaneously,
+    which would cause browser lag and high CPU usage.
+    """
     patient_id = status['patient_id']
-    bed = status['bed_number']
+    cat = status['category']
     name = status['name']
-    
-    # Colors and emojis
-    cat_colors = {1: "#28a745", 2: "#fd7e14", 3: "#dc3545"}
-    cat_emojis = {1: "🟢", 2: "🟠", 3: "🔴"}
-    cat_names = {1: "תקין", 2: "ביניים", 3: "פתולוגי"}
-    
-    # Active events
+    bed = status['bed_number']
     events = status.get('active_events', [])
-    event_badge = f" ⚠️ {len(events)}" if events else ""
     
-    # Card content
-    card_class = f"cat-{cat}"
+    # Calculate staggered refresh time
+    # Base rate: 0.5 seconds
+    # Offset: distribute across 5 groups (0.1s apart)
+    # Result: patients update at 0.5s, 0.6s, 0.7s, 0.8s, 0.9s intervals
+    base_refresh = 0.5
+    offset_group = patient_idx % 5
+    stagger_offset = offset_group * 0.1
+    refresh_interval = base_refresh + stagger_offset
     
-    # Use a button for selection
-    button_label = f"{cat_emojis[cat]} {patient_id} | מיטה {bed}\n{cat_names[cat]}{event_badge}"
+    # Only auto-refresh if simulation is running
+    is_running = orchestrator._running and not orchestrator._paused
+    run_every = refresh_interval if is_running else None
+
+    @st.fragment(run_every=run_every)
+    def _ward_card_fragment():
+        # Card container
+        card_html = f"""
+        <div class="patient-card cat-{cat}">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 600;">{patient_id} - {name}</span>
+                <span>{CAT_DOTS[cat]}</span>
+            </div>
+            <div style="font-size: 0.85rem; color: #666;">
+                Bed {bed} | {CAT_LABELS[cat]}
+                {f' | ⚠️ {len(events)} events' if events else ''}
+            </div>
+        </div>
+        """
+        st.markdown(card_html, unsafe_allow_html=True)
+
+        # Mini sparkline - only last 50 points for performance
+        patient = orchestrator.get_patient(patient_id)
+        if patient:
+            data = patient.get_buffer_data(duration_minutes=1)
+            fhr = data.get('fhr', np.array([]))
+            if len(fhr) > 10:
+                # Limit to last 50 points for performance
+                fig = create_mini_sparkline(fhr[-50:])
+                st.plotly_chart(fig, use_container_width=True, key=f"spark_{patient_id}")
+
+    _ward_card_fragment()
     
-    if st.button(
-        button_label,
-        key=f"patient_card_{patient_id}",
-        use_container_width=True,
-        help=f"לחץ לצפייה ביולדת {name}"
-    ):
+    # Click to detail view (outside fragment to avoid re-render issues)
+    if st.button(f"View Details →", key=f"view_{patient_id}", use_container_width=True):
+        st.session_state.current_view = patient_id
         st.session_state.selected_patient = patient_id
         st.rerun()
 
 
-def render_patient_detail(orchestrator: SimulationOrchestrator):
-    """Render detailed view for selected patient."""
-    selected_patient = st.session_state.get('selected_patient', 'P1')
-    patient = orchestrator.get_patient(selected_patient)
-    
-    if not patient:
-        st.warning(f"יולדת {selected_patient} לא נמצאה")
-        return
-    
-    # Get patient data
-    data = patient.get_buffer_data(duration_minutes=10)
-    status = patient.get_status()
-    
-    # Header with category
-    cat = patient.latest_category
-    cat_colors = {1: "#28a745", 2: "#fd7e14", 3: "#dc3545"}
-    cat_names = {1: "תקין (Normal)", 2: "ביניים (Intermediate)", 3: "פתולוגי (Pathological)"}
-    
-    st.markdown(f"""
-    <div style='background: linear-gradient(90deg, {cat_colors[cat]}22, transparent);
-                padding: 15px; border-radius: 10px; border-left: 5px solid {cat_colors[cat]}'>
-        <h3 style='margin:0;'>👤 {patient.config.name} | מיטה {patient.config.bed_number}</h3>
-        <h2 style='margin:5px 0; color:{cat_colors[cat]}'>
-            קטגוריה {cat} - {cat_names[cat]}
-        </h2>
+def render_ward_card(status: Dict[str, Any], orchestrator: SimulationOrchestrator):
+    """Legacy non-staggered card render (kept for compatibility)."""
+    patient_id = status['patient_id']
+    cat = status['category']
+    name = status['name']
+    bed = status['bed_number']
+    events = status.get('active_events', [])
+
+    # Card container
+    card_html = f"""
+    <div class="patient-card cat-{cat}">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 600;">{patient_id} - {name}</span>
+            <span>{CAT_DOTS[cat]}</span>
+        </div>
+        <div style="font-size: 0.85rem; color: #666;">
+            Bed {bed} | {CAT_LABELS[cat]}
+            {f' | ⚠️ {len(events)} events' if events else ''}
+        </div>
     </div>
-    """, unsafe_allow_html=True)
-    
-    # Active events
-    active_events = patient.get_active_events()
-    if active_events:
-        event_names = [e.event_type.name for e in active_events]
-        st.warning(f"⚠️ **אירועים פעילים:** {', '.join(event_names)}")
-    
-    # CTG Plot
-    st.markdown("### 📈 ניטור CTG | CTG Monitor")
-    
-    fhr = data.get('fhr', np.array([]))
-    uc = data.get('uc', np.array([]))
-    
-    if len(fhr) > 0:
-        # Create CTG plot
-        fig = create_simulation_ctg_plot(fhr, uc, patient.config.name)
-        st.plotly_chart(fig, use_container_width=True, key=f"ctg_plot_{selected_patient}")
-    else:
-        st.info("⏳ ממתין לנתונים... | Waiting for data...")
-    
-    # Findings panel
-    render_findings_panel(patient)
-    
-    # Alert panel
-    render_alert_panel(patient)
+    """
+    st.markdown(card_html, unsafe_allow_html=True)
+
+    # Mini sparkline
+    patient = orchestrator.get_patient(patient_id)
+    if patient:
+        data = patient.get_buffer_data(duration_minutes=1)
+        fhr = data.get('fhr', np.array([]))
+        if len(fhr) > 10:
+            fig = create_mini_sparkline(fhr[-60:])  # Last 60 samples
+            st.plotly_chart(fig, use_container_width=True, key=f"spark_{patient_id}")
+
+    # Click to detail view
+    if st.button(f"View Details →", key=f"view_{patient_id}", use_container_width=True):
+        st.session_state.current_view = patient_id
+        st.session_state.selected_patient = patient_id
+        st.rerun()
 
 
-def create_simulation_ctg_plot(
-    fhr: np.ndarray,
-    uc: np.ndarray,
-    patient_name: str = ""
-) -> go.Figure:
-    """
-    Create a CTG plot for simulation display.
-    
-    Args:
-        fhr: FHR signal array.
-        uc: UC signal array.
-        patient_name: Patient name for title.
-        
-    Returns:
-        Plotly Figure object.
-    """
-    n_samples = len(fhr)
-    time_minutes = np.arange(n_samples) / 4.0 / 60.0  # 4Hz to minutes
-    
-    fig = make_subplots(
-        rows=2, cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.1,
-        row_heights=[0.7, 0.3],
-        subplot_titles=('דופק עוברי | FHR', 'צירים | UC')
-    )
-    
-    # FHR trace
-    fig.add_trace(
-        go.Scatter(
-            x=time_minutes,
-            y=fhr,
-            mode='lines',
-            name='FHR',
-            line=dict(color=COLORS.FHR, width=1.5),
-            hovertemplate='%{y:.0f} bpm<extra></extra>'
-        ),
-        row=1, col=1
-    )
-    
-    # Normal range bands
-    fig.add_hrect(
-        y0=110, y1=160,
-        fillcolor='rgba(40, 167, 69, 0.1)',
-        line_width=0,
-        row=1, col=1
-    )
-    
-    # Reference lines
-    fig.add_hline(y=110, line_dash="dash", line_color="rgba(220, 53, 69, 0.5)", row=1, col=1)
-    fig.add_hline(y=160, line_dash="dash", line_color="rgba(220, 53, 69, 0.5)", row=1, col=1)
-    
-    # UC trace
-    fig.add_trace(
-        go.Scatter(
-            x=time_minutes,
-            y=uc,
-            mode='lines',
-            name='UC',
-            line=dict(color=COLORS.UC, width=1.5),
-            fill='tozeroy',
-            fillcolor='rgba(255, 140, 0, 0.2)',
-            hovertemplate='%{y:.0f}<extra></extra>'
-        ),
-        row=2, col=1
-    )
-    
-    # Layout
+def create_mini_sparkline(fhr: np.ndarray) -> go.Figure:
+    """Create a minimal sparkline chart."""
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        y=fhr,
+        mode='lines',
+        line=dict(color='#000000', width=1),
+        hoverinfo='skip'
+    ))
     fig.update_layout(
-        height=450,
-        showlegend=False,
-        margin=dict(l=50, r=20, t=40, b=40),
+        height=60,
+        margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor='white',
         plot_bgcolor='white',
-        hovermode='x unified'
+        showlegend=False,
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False, range=[80, 200])
     )
-    
-    fig.update_yaxes(
-        title_text="BPM",
-        range=[50, 200],
-        dtick=30,
-        gridcolor='#E5E5E5',
-        row=1, col=1
-    )
-    
-    fig.update_yaxes(
-        title_text="AU",
-        range=[0, 100],
-        gridcolor='#E5E5E5',
-        row=2, col=1
-    )
-    
-    fig.update_xaxes(
-        title_text="זמן (דקות) | Time (min)",
-        gridcolor='#E5E5E5',
-        row=2, col=1
-    )
-    
     return fig
 
 
-def render_findings_panel(patient):
-    """Render the findings panel for a patient."""
-    st.markdown("### 🔍 ממצאים | Findings")
-    
-    findings = patient.latest_findings
-    
-    if not findings:
-        st.info("אין ממצאים זמינים עדיין | No findings available yet")
-        return
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        baseline = findings.get('baseline', {})
-        value = baseline.get('value', 'N/A')
-        is_normal = baseline.get('is_normal', True)
-        color = "green" if is_normal else "red"
-        status = "תקין" if is_normal else ("ברדי" if baseline.get('is_bradycardia') else "טכי")
-        
-        st.metric(
-            label="💓 קו בסיס | Baseline",
-            value=f"{value:.0f} bpm" if isinstance(value, (int, float)) else str(value),
-            delta=status,
-            delta_color="normal" if is_normal else "inverse"
-        )
-    
-    with col2:
-        var = findings.get('variability', {})
-        value = var.get('value', 'N/A')
-        category = var.get('category', 'Unknown')
-        is_normal = var.get('is_normal', False)
-        
-        st.metric(
-            label="📊 שונות | Variability",
-            value=f"{value:.1f} bpm" if isinstance(value, (int, float)) else str(value),
-            delta=category,
-            delta_color="normal" if is_normal else "inverse"
-        )
-    
-    with col3:
-        decels = findings.get('decelerations', {})
-        total = decels.get('total', 0)
-        late = decels.get('late', 0)
-        variable = decels.get('variable', 0)
-        
-        st.metric(
-            label="📉 האטות | Decelerations",
-            value=f"{total}",
-            delta=f"מאוחרות: {late}, משתנות: {variable}",
-            delta_color="normal" if late == 0 else "inverse"
-        )
-    
-    with col4:
-        sinus = findings.get('sinusoidal', {})
-        tachy = findings.get('tachysystole', {})
-        
-        alerts = []
-        if sinus.get('detected', False):
-            alerts.append("סינוסואידלי ⚠️")
-        if tachy.get('detected', False):
-            alerts.append("טכיסיסטולה ⚠️")
-        
-        st.metric(
-            label="⚠️ התראות | Alerts",
-            value=len(alerts),
-            delta=", ".join(alerts) if alerts else "אין",
-            delta_color="inverse" if alerts else "normal"
-        )
-    
-    # Override info
-    if findings.get('override_applied'):
-        st.warning(f"🛡️ **Override הופעל:** {findings.get('override_reason', 'Unknown')}")
+# =============================================================================
+# Detail View
+# =============================================================================
 
+def render_detail_view(orchestrator: SimulationOrchestrator):
+    """Render the Detail view - single patient focus."""
+    patient_id = st.session_state.selected_patient
+    patient = orchestrator.get_patient(patient_id)
 
-def render_alert_panel(patient):
-    """Render the alert panel for a patient."""
-    alert = patient.latest_alert
-    
-    if not alert:
+    if not patient:
+        st.warning(f"Patient {patient_id} not found")
+        if st.button("← Back to Ward"):
+            st.session_state.current_view = "grid"
+            st.rerun()
         return
-    
-    st.markdown("### 🚨 התראה | Alert")
-    
+
+    # Back button
+    if st.button("← Back to Ward", key="back_btn"):
+        st.session_state.current_view = "grid"
+        st.rerun()
+
+    # Header with patient info and category
     cat = patient.latest_category
-    cat_colors = {1: "green", 2: "orange", 3: "red"}
-    
-    # Alert box
-    if cat == 3:
-        st.error(f"**{alert.headline}**")
-    elif cat == 2:
-        st.warning(f"**{alert.headline}**")
-    else:
-        st.success(f"**{alert.headline}**")
-    
-    st.markdown(f"_{alert.explanation}_")
-    
-    # Findings list
-    if alert.findings:
-        st.markdown("**ממצאים:**")
-        for finding in alert.findings:
-            st.markdown(f"• {finding}")
-    
-    # Recommendations
-    if alert.recommendations:
-        st.markdown("**המלצות:**")
-        for rec in alert.recommendations:
-            st.markdown(f"• {rec}")
+    config = patient.config
+
+    st.markdown(f"""
+    <div style="display: flex; justify-content: space-between; align-items: center;
+                border-bottom: 3px solid {CAT_COLORS[cat]}; padding-bottom: 0.5rem; margin-bottom: 1rem;">
+        <div>
+            <h2 style="margin: 0;">{config.name}</h2>
+            <span style="color: #666;">Bed {config.bed_number} | {patient_id}</span>
+        </div>
+        <div style="text-align: right;">
+            <span style="font-size: 1.5rem;">{CAT_DOTS[cat]}</span>
+            <span style="color: {CAT_COLORS[cat]}; font-weight: 600;">Category {cat} - {CAT_LABELS[cat]}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Layout: Patient Info | Monitor | Event Log
+    col_info, col_monitor, col_events = st.columns([1, 2.5, 1])
+
+    with col_info:
+        render_patient_info_panel(patient)
+
+    with col_monitor:
+        render_monitor_panel(orchestrator, patient_id)
+
+    with col_events:
+        render_patient_events_panel(orchestrator, patient_id)
 
 
-def render_event_log(orchestrator: SimulationOrchestrator):
-    """Render the event log panel."""
-    st.markdown("### 📋 יומן אירועים | Event Log")
-    
-    log = orchestrator.get_event_log()
-    entries = log.get_entries(limit=10)
-    
-    if not entries:
-        st.info("היומן ריק | Log is empty")
-        return
-    
-    for entry in reversed(entries):
-        if entry.event_type == 'INJECTION':
-            st.markdown(
-                f"💉 `{entry.simulation_time:.0f}s` | "
-                f"**{entry.patient_id}**: {entry.details.get('injected_event', '?')}"
+def render_patient_info_panel(patient):
+    """Render patient information panel."""
+    st.markdown("#### Patient Info")
+
+    config = patient.config
+    findings = getattr(patient, 'latest_findings', {}) or {}
+    baseline = findings.get('baseline', {})
+    variability = findings.get('variability', {})
+
+    # Basic info
+    st.markdown(f"**Name:** {config.name}")
+    st.markdown(f"**Bed:** {config.bed_number}")
+    st.markdown(f"**Patient ID:** {config.patient_id}")
+
+    st.markdown("---")
+
+    # Current metrics
+    st.markdown("**Current Metrics:**")
+    try:
+        bl_val = float(baseline.get('value', config.baseline_fhr))
+        st.metric("Baseline", f"{bl_val:.0f} bpm")
+    except (TypeError, ValueError):
+        st.metric("Baseline", f"{config.baseline_fhr:.0f} bpm")
+
+    try:
+        var_val = float(variability.get('value', config.baseline_variability))
+        st.metric("Variability", f"{var_val:.1f} bpm")
+    except (TypeError, ValueError):
+        st.metric("Variability", f"{config.baseline_variability:.1f} bpm")
+
+    # Active events
+    active_events = patient.get_active_events()
+    if active_events:
+        st.markdown("---")
+        st.markdown("**Active Events:**")
+        for event in active_events:
+            st.markdown(f"• {event.event_type.name}")
+
+
+def render_monitor_panel(orchestrator: SimulationOrchestrator, patient_id: str):
+    """Render the CTG monitor with fragment for auto-refresh."""
+    st.markdown("#### CTG Monitor")
+
+    refresh_fps = int(st.session_state.get("refresh_fps", DEFAULT_REFRESH_FPS))
+    run_every = (1.0 / float(refresh_fps)) if (orchestrator._running and not orchestrator._paused) else None
+
+    @st.fragment(run_every=run_every)
+    def _monitor_fragment():
+        patient = orchestrator.get_patient(patient_id)
+        if not patient:
+            st.warning("Patient data unavailable")
+            return
+
+        data = patient.get_buffer_data(duration_minutes=10)
+        fhr = data.get('fhr', np.array([]))
+        uc = data.get('uc', np.array([]))
+
+        if len(fhr) > 0:
+            fig = create_ctg_plot(
+                fhr=fhr,
+                uc=uc,
+                sampling_rate=4.0,
+                title="",
+                mode="monitor",
+                window_minutes=20.0,
+                max_points=2000,
+                use_webgl=True,
+                uirevision=f"ctg::{patient_id}"
             )
+            st.plotly_chart(fig, use_container_width=True, key=f"ctg_{patient_id}")
+        else:
+            st.info("Waiting for data...")
+
+        # Findings summary below monitor
+        render_findings_summary(patient)
+
+    _monitor_fragment()
+
+
+def render_findings_summary(patient):
+    """Render compact findings summary."""
+    findings = getattr(patient, 'latest_findings', {}) or {}
+    if not findings:
+        return
+
+    decels = findings.get('decelerations', {})
+    tachy = findings.get('tachysystole', {})
+    sinusoidal = findings.get('sinusoidal', {})
+
+    alerts = []
+    if int(decels.get('late', 0)) > 0:
+        alerts.append(f"Late Decels: {decels.get('late')}")
+    if int(decels.get('variable', 0)) > 0:
+        alerts.append(f"Variable Decels: {decels.get('variable')}")
+    if tachy.get('detected'):
+        alerts.append("Tachysystole")
+    if sinusoidal.get('detected'):
+        alerts.append("Sinusoidal")
+
+    if alerts:
+        st.markdown(f"**Findings:** {' | '.join(alerts)}")
+
+
+def render_patient_events_panel(orchestrator: SimulationOrchestrator, patient_id: str):
+    """Render event log for specific patient."""
+    st.markdown("#### Event Log")
+
+    log = orchestrator.get_event_log()
+    all_entries = log.get_entries(limit=50)
+
+    # Filter for this patient
+    patient_entries = [e for e in all_entries if e.patient_id == patient_id]
+
+    if not patient_entries:
+        st.caption("No events yet")
+        return
+
+    for entry in reversed(patient_entries[:10]):
+        if entry.event_type == 'INJECTION':
+            st.markdown(f"💉 `{entry.simulation_time:.0f}s` {entry.details.get('injected_event', '?')}")
         elif entry.event_type == 'ALERT':
             cat = entry.details.get('category', '?')
-            emoji = {1: "🟢", 2: "🟠", 3: "🔴"}.get(cat, "⚪")
-            st.markdown(
-                f"{emoji} `{entry.simulation_time:.0f}s` | "
-                f"**{entry.patient_id}**: Category {cat}"
-            )
+            st.markdown(f"{CAT_DOTS.get(cat, '⚪')} `{entry.simulation_time:.0f}s` Cat {cat}")
+
+
+# =============================================================================
+# Global Event Log (for Ward View)
+# =============================================================================
+
+def render_global_event_log(orchestrator: SimulationOrchestrator):
+    """Render global event log for all patients."""
+    st.markdown("### Event Log | יומן אירועים")
+
+    log = orchestrator.get_event_log()
+    entries = log.get_entries(limit=15)
+
+    if not entries:
+        st.caption("Log is empty")
+        return
+
+    for entry in reversed(entries):
+        if entry.event_type == 'INJECTION':
+            st.markdown(f"💉 `{entry.simulation_time:.0f}s` **{entry.patient_id}**: {entry.details.get('injected_event', '?')}")
+        elif entry.event_type == 'ALERT':
+            cat = entry.details.get('category', '?')
+            st.markdown(f"{CAT_DOTS.get(cat, '⚪')} `{entry.simulation_time:.0f}s` **{entry.patient_id}**: Cat {cat}")
 
 
 # =============================================================================
@@ -628,54 +758,42 @@ def main():
         layout="wide",
         initial_sidebar_state="collapsed"
     )
-    
+
     # Initialize session state
-    if 'selected_patient' not in st.session_state:
-        st.session_state.selected_patient = 'P1'
-    
-    # Get cached orchestrator
-    orchestrator = get_orchestrator()
-    
-    # Render header
-    render_header()
-    
-    st.markdown("---")
-    
-    # Control panel
-    render_control_panel(orchestrator)
-    
-    st.markdown("---")
-    
-    # Event injection
+    init_session_state()
+
+    # Inject CSS
+    inject_clinical_css()
+
+    # Get orchestrator with current patient count
+    orchestrator = get_orchestrator(st.session_state.patient_count)
+
+    # Header
+    st.markdown('<h1 class="main-header">SentinelFetal Simulator</h1>', unsafe_allow_html=True)
+
+    # Control bar
+    render_control_bar(orchestrator)
+
+    # Event injection (collapsible)
     render_event_injection(orchestrator)
-    
+
     st.markdown("---")
-    
-    # Main content area
-    col_overview, col_detail = st.columns([1, 2])
-    
-    with col_overview:
-        render_patient_overview(orchestrator)
-        st.markdown("---")
-        render_event_log(orchestrator)
-    
-    with col_detail:
-        render_patient_detail(orchestrator)
-    
-    # Auto-refresh logic
-    if orchestrator._running and not orchestrator._paused:
-        time.sleep(1)  # Wait 1 second
-        st.rerun()
-    
+
+    # Main content: Ward View or Detail View
+    if st.session_state.current_view == "grid":
+        # Ward view with side panel for event log
+        col_ward, col_log = st.columns([3, 1])
+        with col_ward:
+            render_ward_view(orchestrator)
+        with col_log:
+            render_global_event_log(orchestrator)
+    else:
+        # Detail view for selected patient
+        render_detail_view(orchestrator)
+
     # Footer
     st.markdown("---")
-    st.markdown(
-        "<p style='text-align:center; color:#888; font-size:0.8rem;'>"
-        "SentinelFetal Simulator v1.0 | Real-Time CTG Training System | "
-        "Powered by MOMENT AI"
-        "</p>",
-        unsafe_allow_html=True
-    )
+    st.caption("SentinelFetal Simulator v2.0 | Clinical Minimalism UI | Powered by MOMENT AI")
 
 
 if __name__ == "__main__":

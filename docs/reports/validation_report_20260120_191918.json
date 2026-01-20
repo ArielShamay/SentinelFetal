@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-01-20T19:19:18.214806",
+  "version": "3.0",
+  "total_tests": 8,
+  "passed_tests": 1,
+  "failed_tests": 7,
+  "total_duration_seconds": 0.2536676999880001,
+  "memory_peak_mb": 412.48828125,
+  "results": [
+    {
+      "name": "MiniRocket Availability",
+      "passed": false,
+      "duration_ms": 0.001500011421740055,
+      "details": {},
+      "error": "sktime not installed"
+    },
+    {
+      "name": "MiniRocket Performance",
+      "passed": false,
+      "duration_ms": 0.00100000761449337,
+      "details": {},
+      "error": "sktime not installed"
+    },
+    {
+      "name": "30-Second Descent Time Rule",
+      "passed": false,
+      "duration_ms": 3.086899989284575,
+      "details": {},
+      "error": "name 'DESCENT_TIME_THRESHOLD' is not defined"
+    },
+    {
+      "name": "FSQI Signal Quality Gate",
+      "passed": false,
+      "duration_ms": 5.838199984282255,
+      "details": {},
+      "error": "type SignalQualityResult doesn't define __round__ method"
+    },
+    {
+      "name": "Coiflet 4 Wavelet Denoising",
+      "passed": 

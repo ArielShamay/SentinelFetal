@@ -1,18 +1,21 @@
+# -*- coding: utf-8 -*-
 """
-SentinelFetal Professional UI Styles.
+SentinelFetal Professional UI Styles - Clinical Minimalism.
 
-This module provides custom CSS styling for a professional medical dashboard look.
-All styles are designed to hide Streamlit's default chrome and create a clean,
-medical-grade interface.
+This module provides custom CSS styling for a clean, clinical dashboard.
+Design principles:
+    - White background (#FFFFFF) - Clean, medical-grade
+    - Black text (#000000) - Maximum readability
+    - Minimal decoration - No gradients or large banners
+    - Semantic colors only for status: Green/Orange/Red
 
-Color Palette (Medical):
-    - Primary: #1E3A5F (Navy) - Headers, sidebar
-    - Background: #F8FAFC (Light gray) - Main background
-    - White: #FFFFFF - Cards, panels
-    - Category 1 (Normal): #22C55E (Green)
-    - Category 2 (Intermediate): #F59E0B (Amber)
-    - Category 3 (Pathological): #EF4444 (Red)
-    - Accent: #3B82F6 (Blue) - Buttons, links
+Color Palette (Clinical Minimalism):
+    - Background: #FFFFFF (Pure white)
+    - Text: #000000 (Pure black)
+    - Category 1 (Normal): #28a745 (Green)
+    - Category 2 (Intermediate): #fd7e14 (Orange)
+    - Category 3 (Pathological): #dc3545 (Red)
+    - Border: #E5E5E5 (Light gray)
 
 Typography:
     - Primary: Inter, -apple-system, sans-serif
@@ -30,36 +33,37 @@ import streamlit as st
 # ============================================================================
 
 COLORS = {
-    # Primary palette
-    'primary': '#1E3A5F',
-    'primary_light': '#2D4A6F',
-    'primary_dark': '#0F2A4F',
-    
-    # Background
-    'background': '#F8FAFC',
-    'background_dark': '#E2E8F0',
+    # Clinical Minimalism Palette
+    # Background - Pure white
+    'background': '#FFFFFF',
     'card': '#FFFFFF',
-    
-    # Text
-    'text_primary': '#1E293B',
-    'text_secondary': '#64748B',
-    'text_muted': '#94A3B8',
-    
-    # Category colors
-    'category_1': '#22C55E',  # Green - Normal
-    'category_1_light': '#DCFCE7',
-    'category_2': '#F59E0B',  # Amber - Intermediate
-    'category_2_light': '#FEF3C7',
-    'category_3': '#EF4444',  # Red - Pathological
-    'category_3_light': '#FEE2E2',
-    
-    # Accent
-    'accent': '#3B82F6',
-    'accent_light': '#DBEAFE',
-    
-    # Borders
-    'border': '#E2E8F0',
-    'border_dark': '#CBD5E1',
+
+    # Text - Pure black for maximum readability
+    'text_primary': '#000000',
+    'text_secondary': '#333333',
+    'text_muted': '#666666',
+
+    # Category colors (semantic only)
+    'category_1': '#28a745',  # Green - Normal
+    'category_1_light': '#d4edda',
+    'category_2': '#fd7e14',  # Orange - Intermediate
+    'category_2_light': '#fff3cd',
+    'category_3': '#dc3545',  # Red - Pathological
+    'category_3_light': '#f8d7da',
+
+    # Accent - Subtle black
+    'accent': '#000000',
+    'accent_light': '#f5f5f5',
+
+    # Borders - Light gray
+    'border': '#E5E5E5',
+    'border_dark': '#CCCCCC',
+
+    # Legacy compatibility (some code may reference these)
+    'primary': '#000000',
+    'primary_light': '#333333',
+    'primary_dark': '#000000',
+    'background_dark': '#F5F5F5',
 }
 
 
@@ -103,135 +107,182 @@ def get_hide_streamlit_chrome_css() -> str:
 
 
 def get_sidebar_css() -> str:
-    """CSS for professional sidebar styling."""
+    """CSS for sidebar styling - Clinical Minimalism (collapsed by default)."""
     return f"""
-        /* Sidebar background */
+        /* Sidebar background - white/light gray */
         [data-testid="stSidebar"] {{
-            background: linear-gradient(180deg, {COLORS['primary']} 0%, {COLORS['primary_dark']} 100%);
+            background-color: {COLORS['accent_light']};
+            border-right: 1px solid {COLORS['border']};
         }}
-        
-        /* Sidebar content */
+
+        /* Sidebar content - black text */
         [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {{
-            color: white !important;
+            color: {COLORS['text_primary']} !important;
         }}
-        
+
         [data-testid="stSidebar"] h1,
         [data-testid="stSidebar"] h2,
         [data-testid="stSidebar"] h3 {{
-            color: white !important;
+            color: {COLORS['text_primary']} !important;
         }}
-        
+
         [data-testid="stSidebar"] label {{
-            color: rgba(255, 255, 255, 0.9) !important;
+            color: {COLORS['text_primary']} !important;
         }}
-        
+
         [data-testid="stSidebar"] .stSelectbox label {{
-            color: rgba(255, 255, 255, 0.9) !important;
+            color: {COLORS['text_primary']} !important;
         }}
-        
+
         /* Sidebar dividers */
         [data-testid="stSidebar"] hr {{
-            border-color: rgba(255, 255, 255, 0.2);
+            border-color: {COLORS['border']};
         }}
-        
+
         /* Sidebar caption */
         [data-testid="stSidebar"] .stCaption {{
-            color: rgba(255, 255, 255, 0.6) !important;
-        }}
-        
-        /* Sidebar info box */
-        [data-testid="stSidebar"] .stAlert {{
-            background-color: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
+            color: {COLORS['text_muted']} !important;
         }}
     """
 
 
 def get_main_content_css() -> str:
-    """CSS for main content area styling."""
+    """CSS for main content area styling - Clinical Minimalism."""
     return f"""
-        /* Main background */
+        /* Main background - Pure white */
         .stApp {{
             background-color: {COLORS['background']};
         }}
-        
+
         /* Main content area */
         .main .block-container {{
-            max-width: 1400px;
-            padding: 1rem 2rem;
+            max-width: 1600px;
+            padding: 1rem 1.5rem;
+            background-color: {COLORS['background']};
         }}
-        
-        /* Card-like containers */
+
+        /* Card-like containers - minimal styling */
         .stExpander {{
             background-color: {COLORS['card']};
             border: 1px solid {COLORS['border']};
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            border-radius: 6px;
         }}
-        
-        /* Metric cards */
+
+        /* Metric cards - clean design */
         [data-testid="stMetric"] {{
             background-color: {COLORS['card']};
-            padding: 1rem;
-            border-radius: 8px;
+            padding: 0.75rem;
+            border-radius: 4px;
             border: 1px solid {COLORS['border']};
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
         }}
-        
+
         [data-testid="stMetricLabel"] {{
-            color: {COLORS['text_secondary']} !important;
+            color: {COLORS['text_primary']} !important;
             font-size: 0.85rem !important;
+            font-weight: 500 !important;
         }}
-        
+
         [data-testid="stMetricValue"] {{
             color: {COLORS['text_primary']} !important;
             font-weight: 600 !important;
         }}
+
+        /* Remove shadows for cleaner look */
+        .stExpander, [data-testid="stMetric"] {{
+            box-shadow: none !important;
+        }}
+
+        /* Form controls - force white background with black text */
+        [data-testid="stSelectbox"] > div > div {
+            background: #FFFFFF !important;
+            color: #000000 !important;
+            border: 1px solid {COLORS['border']};
+        }
+
+        [data-testid="stSelectbox"] [role="combobox"],
+        [data-testid="stSelectbox"] [data-baseweb="select"] {
+            background: #FFFFFF !important;
+            color: #000000 !important;
+        }
+
+        /* Dropdown menu */
+        [role="listbox"],
+        [data-baseweb="menu"] {
+            background: #FFFFFF !important;
+            color: #000000 !important;
+            border: 1px solid {COLORS['border']};
+        }
+
+        /* Dropdown options */
+        [role="option"] {
+            color: #000000 !important;
+            background: #FFFFFF !important;
+        }
+
+        /* Number inputs */
+        [data-testid="stNumberInput"] input {
+            background: #FFFFFF !important;
+            color: #000000 !important;
+            border: 1px solid {COLORS['border']};
+        }
+
+        /* Expander headers */
+        [data-testid="stExpander"] summary {
+            background: #FFFFFF !important;
+            color: #000000 !important;
+            border-bottom: 1px solid {COLORS['border']};
+        }
     """
 
 
 def get_typography_css() -> str:
-    """CSS for typography styling."""
+    """CSS for typography styling - Clinical Minimalism (black text)."""
     return f"""
         /* Import Google Font */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        /* Base font */
+
+        /* Base font - black on white */
         html, body, [class*="css"] {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: {COLORS['text_primary']};
         }}
-        
-        /* Headings */
+
+        /* All headings - pure black */
+        h1, h2, h3, h4, h5, h6 {{
+            color: {COLORS['text_primary']} !important;
+        }}
+
         h1 {{
-            color: {COLORS['primary']} !important;
             font-weight: 700 !important;
             font-size: 1.75rem !important;
         }}
-        
+
         h2 {{
-            color: {COLORS['text_primary']} !important;
             font-weight: 600 !important;
             font-size: 1.25rem !important;
         }}
-        
+
         h3 {{
-            color: {COLORS['text_primary']} !important;
             font-weight: 600 !important;
             font-size: 1.1rem !important;
         }}
-        
-        /* Body text */
-        p, li {{
+
+        /* Body text - black */
+        p, li, span, div {{
             color: {COLORS['text_primary']};
-            line-height: 1.6;
         }}
-        
-        /* Subheaders */
+
+        /* Links - black with underline */
+        a {{
+            color: {COLORS['text_primary']} !important;
+            text-decoration: underline;
+        }}
+
+        /* Subheaders - minimal styling */
         .stSubheader {{
             color: {COLORS['text_primary']} !important;
             font-weight: 600 !important;
-            border-bottom: 2px solid {COLORS['accent']};
+            border-bottom: 1px solid {COLORS['border']};
             padding-bottom: 0.5rem;
             margin-bottom: 1rem;
         }}
@@ -239,115 +290,147 @@ def get_typography_css() -> str:
 
 
 def get_alert_css() -> str:
-    """CSS for custom alert/category banners."""
+    """CSS for category indicators - Clinical Minimalism (no large banners)."""
     return f"""
-        /* Category 1 (Normal) banner */
-        .category-banner-1 {{
-            background: linear-gradient(135deg, {COLORS['category_1']} 0%, #16A34A 100%);
-            padding: 1.25rem 1.5rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px rgba(34, 197, 94, 0.2);
+        /* Category indicators - small, inline colored dots/text */
+        .category-indicator {{
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
         }}
-        
-        /* Category 2 (Intermediate) banner */
-        .category-banner-2 {{
-            background: linear-gradient(135deg, {COLORS['category_2']} 0%, #D97706 100%);
-            padding: 1.25rem 1.5rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);
+
+        .category-indicator-1 {{
+            color: {COLORS['category_1']};
+            border: 1px solid {COLORS['category_1']};
         }}
-        
-        /* Category 3 (Pathological) banner */
-        .category-banner-3 {{
-            background: linear-gradient(135deg, {COLORS['category_3']} 0%, #DC2626 100%);
-            padding: 1.25rem 1.5rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);
+
+        .category-indicator-2 {{
+            color: {COLORS['category_2']};
+            border: 1px solid {COLORS['category_2']};
         }}
-        
-        .category-banner-1 h2,
-        .category-banner-2 h2,
-        .category-banner-3 h2 {{
-            color: white !important;
-            margin: 0 !important;
-            font-size: 1.5rem !important;
+
+        .category-indicator-3 {{
+            color: {COLORS['category_3']};
+            border: 1px solid {COLORS['category_3']};
         }}
-        
-        .category-banner-1 p,
-        .category-banner-2 p,
-        .category-banner-3 p {{
-            color: rgba(255, 255, 255, 0.9) !important;
-            margin: 0.5rem 0 0 0 !important;
+
+        /* Status dot - minimal colored indicator */
+        .status-dot {{
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
         }}
-        
-        /* Finding cards */
+
+        .status-dot-1 {{ background-color: {COLORS['category_1']}; }}
+        .status-dot-2 {{ background-color: {COLORS['category_2']}; }}
+        .status-dot-3 {{ background-color: {COLORS['category_3']}; }}
+
+        /* Category banners - ensure white background + black text */
+        .category-banner-1, .category-banner-2, .category-banner-3 {{
+            background: #FFFFFF;
+            color: #000000;
+            border: 1px solid {COLORS['border']};
+            border-left-width: 6px;
+            padding: 0.85rem 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 1rem;
+        }}
+
+        .category-banner-1 {{ border-left-color: {COLORS['category_1']}; }}
+        .category-banner-2 {{ border-left-color: {COLORS['category_2']}; }}
+        .category-banner-3 {{ border-left-color: {COLORS['category_3']}; }}
+
+        .category-banner-1 h2, .category-banner-2 h2, .category-banner-3 h2,
+        .category-banner-1 p,  .category-banner-2 p,  .category-banner-3 p {{
+            margin: 0;
+            color: #000000;
+        }}
+
+        /* Finding cards - clean, minimal */
         .finding-card {{
             background-color: {COLORS['card']};
             border: 1px solid {COLORS['border']};
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 0.75rem;
+            border-radius: 4px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
         }}
-        
+
         .finding-card:hover {{
-            border-color: {COLORS['accent']};
-            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+            border-color: {COLORS['border_dark']};
         }}
-        
-        /* Recommendation styling based on category */
+
+        /* Recommendation styling - subtle colored border */
         .recommendation-normal {{
-            background-color: {COLORS['category_1_light']};
-            border-left: 4px solid {COLORS['category_1']};
-            padding: 0.75rem 1rem;
-            border-radius: 0 8px 8px 0;
+            border-left: 3px solid {COLORS['category_1']};
+            padding: 0.5rem 0.75rem;
             margin-bottom: 0.5rem;
         }}
-        
+
         .recommendation-warning {{
-            background-color: {COLORS['category_2_light']};
-            border-left: 4px solid {COLORS['category_2']};
-            padding: 0.75rem 1rem;
-            border-radius: 0 8px 8px 0;
+            border-left: 3px solid {COLORS['category_2']};
+            padding: 0.5rem 0.75rem;
             margin-bottom: 0.5rem;
         }}
-        
+
         .recommendation-critical {{
-            background-color: {COLORS['category_3_light']};
-            border-left: 4px solid {COLORS['category_3']};
-            padding: 0.75rem 1rem;
-            border-radius: 0 8px 8px 0;
+            border-left: 3px solid {COLORS['category_3']};
+            padding: 0.5rem 0.75rem;
             margin-bottom: 0.5rem;
         }}
+
+        /* Hide large st.error/warning/success banners - use colored text instead */
+        .stAlert {{
+            background-color: transparent !important;
+            border: none !important;
+            padding: 0.25rem 0 !important;
+        }}
+
+        /* Category colored text */
+        .text-normal {{ color: {COLORS['category_1']} !important; }}
+        .text-warning {{ color: {COLORS['category_2']} !important; }}
+        .text-critical {{ color: {COLORS['category_3']} !important; }}
     """
 
 
 def get_button_css() -> str:
-    """CSS for button styling."""
+    """CSS for button styling - Clinical Minimalism (black/white)."""
     return f"""
-        /* Primary buttons */
+        /* Primary buttons - black on white */
         .stButton > button {{
-            background-color: {COLORS['accent']};
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 0.5rem 1.5rem;
+            background-color: {COLORS['text_primary']};
+            color: {COLORS['background']};
+            border: 1px solid {COLORS['text_primary']};
+            border-radius: 4px;
+            padding: 0.5rem 1rem;
             font-weight: 500;
-            transition: all 0.2s ease;
+            transition: all 0.15s ease;
         }}
-        
+
         .stButton > button:hover {{
-            background-color: #2563EB;
-            box-shadow: 0 4px 6px rgba(59, 130, 246, 0.25);
-            transform: translateY(-1px);
+            background-color: {COLORS['background']};
+            color: {COLORS['text_primary']};
         }}
-        
+
         /* Download button */
         .stDownloadButton > button {{
-            background-color: {COLORS['primary']};
-            color: white;
+            background-color: {COLORS['text_primary']};
+            color: {COLORS['background']};
+        }}
+
+        /* Start/Stop buttons - functional colors */
+        .start-btn {{
+            background-color: {COLORS['category_1']} !important;
+            border-color: {COLORS['category_1']} !important;
+        }}
+
+        .stop-btn {{
+            background-color: {COLORS['category_3']} !important;
+            border-color: {COLORS['category_3']} !important;
         }}
     """
 

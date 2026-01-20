@@ -1,4 +1,5 @@
 # SentinelFetal Dependencies
+# Updated: Phase 2 refactor - MiniRocket replaces MOMENT
 
 # Data handling
 numpy>=1.24.0
@@ -16,12 +17,21 @@ plotly>=5.14.0
 pytest>=7.3.0
 pytest-cov>=4.1.0
 
-# ML (for later phases)
+# ML - Core (lightweight)
 scikit-learn>=1.2.0
-# xgboost>=1.7.0
-# tensorflow>=2.12.0
 
-# ONNX Optimization (Phase 2 V2 Architecture)
+# Time Series Classification - MiniRocket (replaces MOMENT)
+# MiniRocket: 75x faster than ROCKET, 84 fixed kernels vs 341M params
+sktime>=0.24.0
+numba>=0.58.0  # Required by MiniRocket for JIT compilation
+
+# Deep Learning (optional - InceptionTime alternative)
+# tsai>=0.3.7  # Uncomment if deep learning approach needed
+
+# Signal Processing
+pywavelets>=1.4.0  # Coiflet 4 wavelet denoising
+
+# ONNX Optimization
 onnx>=1.14.0
 onnxruntime>=1.15.0
 
@@ -34,6 +44,7 @@ onnxruntime>=1.15.0
 tqdm>=4.65.0
 python-dateutil>=2.8.0
 psutil>=5.9.0
+joblib>=1.3.0  # Model serialization
 
 # Streamlit UI
 streamlit>=1.28.0

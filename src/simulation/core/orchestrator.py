@@ -55,7 +55,9 @@ class OrchestratorConfig:
     patient_names: List[str] = field(default_factory=lambda: [
         "שרה כהן", "רחל לוי", "מירי גולן", "יעל ברק",
         "נועה שמיר", "דנה רוזן", "טלי אברהם", "ליאת פרידמן",
-        "הילה דוד", "עדי משה", "רונית בן", "שירה גל"
+        "הילה דוד", "עדי משה", "רונית בן", "שירה גל",
+        "מיכל אלון", "תמר רז", "אורית שלום", "גלית עוז",
+        "רותי ים", "ענת כרמל", "לירון נהר", "אביגיל הר"
     ])
     
     @property
@@ -218,7 +220,54 @@ class SimulationOrchestrator:
         """
         self._speed_multiplier = max(0.5, min(2.0, multiplier))
         logger.info(f"Simulation speed set to {self._speed_multiplier}x")
-    
+
+    def set_patient_count(self, count: int) -> None:
+        """
+        Dynamically change the number of patients.
+
+        Stops simulation, recreates patients, and resets state.
+        Caller must restart simulation after this call.
+
+        Args:
+            count: Number of patients (1-20, clamped).
+        """
+        count = max(1, min(20, count))
+        if count == self.config.num_patients:
+            return
+
+        was_running = self._running
+
+        # Stop simulation
+        if self._running:
+            self.stop()
+
+        with self._lock:
+            # Update config
+            self.config.num_patients = count
+
+            # Clear and recreate patients
+            self._patients.clear()
+            self._create_patients()
+
+            # Reset MOMENT schedule
+            self._moment_schedule = list(self._patients.keys())
+            self._moment_index = 0
+            self._last_moment_time = 0.0
+
+            # Reset statistics
+            self._tick_count = 0
+            self._moment_process_count = 0
+            self._simulation_time = 0.0
+
+            # Clear event log
+            self._logger = EventLogger(max_entries=1000)
+
+        logger.info(f"Patient count changed to {count}")
+
+        # Optionally restart if it was running
+        if was_running:
+            self.start()
+
     @property
     def is_running(self) -> bool:
         """Check if simulation is currently running."""
