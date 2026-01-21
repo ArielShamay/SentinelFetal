@@ -2,7 +2,7 @@
 
 **The path to dramatically improving SentinelFetal's deceleration detection—currently at 23% for Late and 14% for Variable decelerations—lies not in replacing your architecture but in three targeted interventions: implementing validated signal quality filtering that eliminates 95% of false detections, adding the single most discriminative feature (30-second descent time), and switching from MOMENT to MiniRocket for a 10-20x inference speedup.**
 
-This report synthesizes research across eight domains to provide implementable recommendations, prioritized by impact-to-effort ratio. The current MOMENT encoder (341M parameters) is likely overkill for this task—state-of-the-art CTG classification achieves AUC 0.74-0.88 with much simpler architectures. The key insight: your bottleneck is almost certainly **feature engineering and signal quality**, not model capacity.
+This report synthesizes research across eight domains to provide implementable recommenda tions, prioritized by impact-to-effort ratio. The current MOMENT encoder (341M parameters) is likely overkill for this task—state-of-the-art CTG classification achieves AUC 0.74-0.88 with much simpler architectures. The key insight: your bottleneck is almost certainly **feature engineering and signal quality**, not model capacity.
 
 ---
 

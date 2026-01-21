@@ -241,9 +241,12 @@ def calculate_descent_time(
         - < 30 seconds: ABRUPT onset → Variable deceleration
         - ≥ 30 seconds: GRADUAL onset → Late or Early deceleration
     
+    ROBUST VERSION: Scans backwards from 'decel_start' (threshold crossing)
+    to find the true onset of the deceleration.
+    
     Args:
         fhr: FHR signal array.
-        decel_start: Start index of deceleration.
+        decel_start: Start index of deceleration (threshold crossing).
         nadir_idx: Index of the nadir (minimum point).
         sampling_rate: Sampling frequency in Hz (default: 4.0).
         
@@ -253,9 +256,68 @@ def calculate_descent_time(
     if nadir_idx <= decel_start:
         return 0.0
     
-    descent_samples = nadir_idx - decel_start
+    try:
+        # Standard approach: decel_start is where FHR drops below Baseline - Threshold (15bpm)
+        # To find VALID descent time, we must look back to where it left the baseline.
+        
+        if decel_start >= len(fhr):
+            return 0.0
+            
+        threshold_val = float(fhr[decel_start])
+        # We want to find where signal was higher (closer to baseline)
+        # Assuming decel_start is already ~15bpm below baseline
+        # Let's look for a rise of at least 10 bpm above the start threshold
+        target_val = threshold_val + 10.0
+        
+        true_start_idx = decel_start
+        # Look back up to 90 seconds (generous) to find the onset
+        lookback_limit = max(0, decel_start - int(90 * sampling_rate))
+        
+        found_onset = False
+        
+        # Scan backward for the true onset (crossing back above the threshold gap)
+        for i in range(decel_start, lookback_limit, -1):
+            val = fhr[i]
+            if np.isnan(val):
+                continue
+            if val >= target_val:
+                true_start_idx = i
+                found_onset = True
+                
+                # Refinement: Look for local Maxima around this crossing
+                # This helps pinpoint exact start of descent
+                window_start = max(0, i - int(10*sampling_rate))
+                window_end = min(len(fhr), i + 2)
+                local_window = fhr[window_start:window_end]
+                # Filter NaNs for argmax
+                if len(local_window) > 0 and not np.all(np.isnan(local_window)):
+                    peak_offset = np.nanargmax(local_window)
+                    true_start_idx = window_start + peak_offset
+                    # Found peak
+                break
+        
+        if not found_onset:
+            # Try finding max in the window anyway
+            window_fhr = fhr[lookback_limit:decel_start+1]
+            if len(window_fhr) > 0:
+                 peak_rel = np.nanargmax(window_fhr)
+                 if window_fhr[peak_rel] > threshold_val + 5.0:
+                     true_start_idx = lookback_limit + peak_rel
+
+        logger.debug(f"Adjusted onset: {decel_start} -> {true_start_idx} (Target: {target_val:.1f})")
+        
+    except Exception as e:
+        logger.warning(f"Error calculating descent time: {e}")
+        true_start_idx = decel_start
+
+    descent_samples = nadir_idx - true_start_idx
     descent_time_seconds = descent_samples / sampling_rate
     
+    # Sanity check
+    if descent_time_seconds < 0:
+        descent_time_seconds = 0.0
+    
+    logger.debug(f"Descent Time: {descent_time_seconds:.1f}s")
     return descent_time_seconds
 
 

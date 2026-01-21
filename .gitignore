@@ -48,6 +48,9 @@ htmlcov/
 data/ctu-chb-intrapartum-cardiotocography-database-1.0.0/ctu-chb-intrapartum-cardiotocography-database-1.0.0/*.dat
 data/ctu-chb-intrapartum-cardiotocography-database-1.0.0/ctu-chb-intrapartum-cardiotocography-database-1.0.0/*.qrs
 *.pkl
+
+# Windows special files
+nul
 *.h5
 *.hdf5
 

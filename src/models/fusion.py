@@ -151,11 +151,12 @@ def build_feature_vector(
     """
     Build the complete 1035-dimensional feature vector.
     
-    Combines MOMENT embeddings with rule-based features according to
-    the specification in Section 6.2.
+    Combines encoder embeddings (MOMENT or MiniRocket) with rule-based
+    features according to the specification in Section 6.2.
     
     Args:
-        embedding: 1024-dimensional MOMENT embedding.
+        embedding: Encoder embedding. Resized to 1024 dims for classifier
+            compatibility (truncates or pads as needed).
         baseline: Baseline FHR value or BaselineResult object.
         variability: Variability info (dict or VariabilityResult).
         decelerations: List of detected decelerations.
@@ -187,18 +188,28 @@ def build_feature_vector(
     References:
         SentinelFetal Gen3.5 Technical Specification, Section 6.2
     """
-    # Validate embedding
-    if embedding.shape != (EMBEDDING_DIM,):
-        raise ValueError(
-            f"Embedding must be {EMBEDDING_DIM}-dimensional, got {embedding.shape}"
-        )
+    def _normalize_embedding(emb: np.ndarray) -> np.ndarray:
+        """Resize any encoder embedding to the 1024-dim classifier input."""
+        emb_arr = np.asarray(emb, dtype=float).ravel()
+        size = emb_arr.size
+        if size == EMBEDDING_DIM:
+            return emb_arr
+        if size > EMBEDDING_DIM:
+            # Compress by averaging contiguous chunks to 1024 dims
+            return np.array([chunk.mean() for chunk in np.array_split(emb_arr, EMBEDDING_DIM)], dtype=float)
+        # Pad with zeros when shorter
+        padded = np.zeros(EMBEDDING_DIM, dtype=float)
+        padded[:size] = emb_arr
+        return padded
+
+    embedding_norm = _normalize_embedding(embedding)
     
     features: List[float] = []
     
     # =========================================================================
     # 1. MOMENT Embedding (indices 0-1023)
     # =========================================================================
-    features.extend(embedding.tolist())
+    features.extend(embedding_norm.tolist())
     
     # =========================================================================
     # 2. Baseline (index 1024) - Normalized by 160

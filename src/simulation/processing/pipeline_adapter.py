@@ -4,9 +4,9 @@ Pipeline Adapter - Bridges simulation to existing SentinelFetal pipeline.
 This adapter connects the real-time simulator's RingBuffer output to the
 existing Gen3.5 analysis pipeline, running the complete processing chain:
 
-    Preprocess → Rule Engine → MOMENT → Fusion → Classifier → Override → Alert
+    Preprocess → Rule Engine → MiniRocket → Fusion → Classifier → Override → Alert
 
-CRITICAL: Uses the REAL MOMENT model (use_mock=False) by default.
+CRITICAL: Uses lightweight MiniRocket embeddings by default (MOMENT disabled).
 
 References:
     - SentinelFetal Real-Time Simulator SPEC Part 2, Section 7
@@ -24,12 +24,13 @@ import numpy as np
 
 # Import from existing modules
 from src.data.preprocess import CTGPreprocessor, PreprocessingConfig
+from src.data.signal_quality import apply_quality_gate  # Added FSQI
 from src.rules.baseline import calculate_baseline
 from src.rules.variability import calculate_variability
 from src.rules.decelerations import detect_decelerations
 from src.rules.tachysystole import detect_tachysystole
 from src.rules.sinusoidal import detect_sinusoidal_pattern
-from src.models.moment_encoder import MomentFeatureExtractor
+from src.models.minirocket_encoder import MiniRocketEncoder, MiniRocketEncoderError
 from src.models.fusion import build_feature_vector
 from src.models.classifier import XGBClassifierWrapper
 from src.analysis.override import apply_medical_override
@@ -45,12 +46,13 @@ class PipelineAdapterConfig:
     Configuration for pipeline adapter.
     
     Attributes:
-        use_real_moment: Whether to use real MOMENT model (default: True).
+        use_real_moment: Legacy flag; MiniRocket is always used now.
         model_path: Path to the XGBoost classifier model.
         sampling_rate: Signal sampling rate in Hz.
         min_data_seconds: Minimum data required for processing.
     """
-    use_real_moment: bool = True  # CRITICAL: Use real MOMENT model
+    # Legacy flag retained for compatibility; MiniRocket is now the default engine
+    use_real_moment: bool = False
     model_path: str = "models/sentinel_classifier.json"
     sampling_rate: float = 4.0
     min_data_seconds: float = 60.0  # 1 minute minimum
@@ -61,9 +63,8 @@ class PipelineAdapter:
     Bridges simulation with existing SentinelFetal Gen3.5 pipeline.
     
     This adapter:
-    - Uses the REAL MOMENT model (not mock) by default
+    - Uses MiniRocket embeddings by default (MOMENT removed)
     - Runs the complete analysis chain
-    - Caches embeddings for efficiency when MOMENT isn't run every tick
     - Applies medical override rules for safety
     
     Example:
@@ -77,8 +78,7 @@ class PipelineAdapter:
         Initialize the pipeline adapter.
         
         Args:
-            config: Configuration options. If None, uses defaults with
-                   real MOMENT model enabled.
+            config: Configuration options. If None, uses defaults.
         """
         self.config = config or PipelineAdapterConfig()
         
@@ -87,10 +87,16 @@ class PipelineAdapter:
             sampling_rate=self.config.sampling_rate
         ))
         
-        # Initialize MOMENT - CRITICAL: always uses real model
-        logger.info("Initializing MOMENT encoder (real model)")
-        self._moment = MomentFeatureExtractor()
-        logger.info("MOMENT encoder initialized with REAL model")
+        # Initialize MiniRocket (lightweight encoder)
+        self._encoder_available = False
+        try:
+            logger.info("Initializing MiniRocket encoder (lightweight)")
+            self._encoder = MiniRocketEncoder()
+            self._encoder_available = True
+            logger.info("MiniRocket encoder initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize MiniRocket encoder: {e}")
+            self._encoder_available = False
         
         # Initialize classifier
         self._classifier = XGBClassifierWrapper()
@@ -110,12 +116,8 @@ class PipelineAdapter:
         except Exception as e:
             logger.warning(f"Could not load classifier: {e}. Using fallback.")
         
-        # Embedding cache for efficiency
-        self._embedding_cache: Dict[str, np.ndarray] = {}
-        
         # Processing statistics
         self._process_count = 0
-        self._moment_calls = 0
     
     def process_patient(
         self,
@@ -138,8 +140,8 @@ class PipelineAdapter:
         Args:
             patient_id: Patient identifier for caching.
             data: Dictionary with 'fhr', 'uc', 'timestamps' arrays.
-            run_moment: Whether to run MOMENT (expensive, ~100-300ms).
-                       If False, uses cached embedding if available.
+            run_moment: Legacy flag retained for compatibility; ignored when
+                   using MiniRocket.
         
         Returns:
             Dictionary containing:
@@ -169,10 +171,30 @@ class PipelineAdapter:
         
         try:
             # ================================================================
-            # Step 1: Preprocessing
+            # Step 1: Preprocessing & Quality Check
             # ================================================================
             preprocess_result = self._preprocessor.process(fhr.copy())
             fhr_clean = preprocess_result.processed_signal
+            
+            # CRITICAL FSQI GATE
+            passes_gate, quality_result = apply_quality_gate(
+                fhr_clean, self.config.sampling_rate
+            )
+            
+            if not passes_gate:
+                # Signal Rejected!
+                logger.info(f"Signal rejected by FSQI: {quality_result.message} (Score: {quality_result.score:.2f})")
+                return {
+                    'category': 2, # Fallback/Uncertain
+                    'alert': None, 
+                    'findings': {
+                        'error': 'Signal Quality Too Low', 
+                        'quality_score': quality_result.score,
+                        'message': quality_result.message
+                    },
+                    'confidence': 0.0,
+                    'insufficient_data': True # Treat as insufficient
+                }
             
             # ================================================================
             # Step 2: Rule Engine
@@ -198,27 +220,30 @@ class PipelineAdapter:
             )
             
             # ================================================================
-            # Step 3: MOMENT Embedding
+            # Step 3: MiniRocket Features (lightweight, default engine)
             # ================================================================
-            if run_moment:
-                # extract() returns numpy array directly (not EmbeddingResult)
-                embedding = self._moment.extract(fhr_clean)
-                self._embedding_cache[patient_id] = embedding
-                self._moment_calls += 1
-            else:
-                # Use cached embedding if available
-                embedding = self._embedding_cache.get(patient_id)
-                if embedding is None:
-                    # Generate a placeholder if no cache
-                    # This should only happen on first run without MOMENT
-                    embedding = np.zeros(1024, dtype=np.float32)
-                    logger.debug(f"No cached embedding for {patient_id}")
+            features = None
+            if self._encoder_available:
+                try:
+                    feature_result = self._encoder.extract_features(
+                        fhr_clean,
+                        self.config.sampling_rate
+                    )
+                    features = feature_result.features
+                except MiniRocketEncoderError as e:
+                    logger.warning(f"MiniRocket encoding failed: {e}")
+                except Exception as e:
+                    logger.warning(f"MiniRocket unexpected error: {e}")
+            
+            if features is None:
+                # Fallback: zero vector to keep pipeline running
+                features = np.zeros(9996, dtype=np.float32)
             
             # ================================================================
             # Step 4: Feature Vector Fusion
             # ================================================================
             feature_vector = build_feature_vector(
-                embedding=embedding,
+                embedding=features,
                 baseline=baseline_result,
                 variability=variability_result,
                 decelerations=decelerations,
@@ -409,29 +434,19 @@ class PipelineAdapter:
         return 1
     
     def clear_cache(self, patient_id: Optional[str] = None) -> None:
-        """
-        Clear embedding cache.
-        
-        Args:
-            patient_id: If provided, clear only this patient's cache.
-                       If None, clear all caches.
-        """
-        if patient_id:
-            self._embedding_cache.pop(patient_id, None)
-        else:
-            self._embedding_cache.clear()
+        """No-op cache clearer (MiniRocket has no per-patient cache)."""
+        return
     
     def get_stats(self) -> Dict[str, Any]:
         """Get processing statistics."""
         return {
             'total_processes': self._process_count,
-            'moment_calls': self._moment_calls,
-            'cached_patients': len(self._embedding_cache),
+            'encoder_available': self._encoder_available,
             'classifier_loaded': self._classifier_loaded,
-            'using_real_moment': not self._moment.use_mock
+            'using_minirocket': self._encoder_available
         }
     
     @property
-    def is_moment_real(self) -> bool:
-        """Check if using real MOMENT model."""
-        return not self._moment.use_mock
+    def is_minirocket_ready(self) -> bool:
+        """Check if MiniRocket encoder is available."""
+        return self._encoder_available

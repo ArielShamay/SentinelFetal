@@ -153,6 +153,16 @@ def calculate_fsqi(
         weights['stability'] * stability_score
     )
     
+    # VETO RULES: Safety mechanism to reject specific failure modes
+    # 1. If noise is severe (score < 0.3), signal is unusable regardless of other metrics
+    if noise_score < 0.3:
+        logger.warning(f"FSQI Veto: Severe noise detected (score={noise_score:.2f})")
+        score = min(score, 0.3)  # Cap at 0.3 (LOW quality)
+        
+    # 2. If stability is very low (artifacts), reduce score
+    if stability_score < 0.3:
+        score = min(score, 0.5)  # Cap at 0.5 (MEDIUM quality)
+    
     # Determine quality classification
     if score >= HIGH_QUALITY_THRESHOLD:
         quality = SignalQuality.HIGH
@@ -236,25 +246,35 @@ def _calculate_noise_score(fhr: np.ndarray, sampling_rate: float) -> float:
         )
         
         # Define frequency bands
-        low_freq_mask = (freqs >= 0.01) & (freqs <= 0.5)   # Signal band
-        high_freq_mask = (freqs > 0.5) & (freqs <= 2.0)    # Noise band
+        # Signal band: 0.03 - 0.5 Hz (Physiological variability)
+        low_freq_mask = (freqs >= 0.03) & (freqs <= 0.5) 
+        # Noise band: > 0.5 Hz (High frequency artifact)
+        high_freq_mask = (freqs > 0.5)
         
         low_power = np.sum(psd[low_freq_mask]) if np.any(low_freq_mask) else 0
         high_power = np.sum(psd[high_freq_mask]) if np.any(high_freq_mask) else 0
         
+        if high_power == 0:
+            return 1.0 # No high frequency noise
+            
         total_power = low_power + high_power
-        
         if total_power == 0:
             return 0.5
         
-        # Signal-to-noise ratio (low freq / high freq)
-        snr = low_power / (high_power + 1e-10)
+        # Signal-to-noise ratio
+        # STRICTER: If significant high frequency power exists, score drops rapidly
+        ratio = low_power / (high_power + 1e-10)
         
-        # Convert to 0-1 score (SNR > 10 is excellent, < 1 is poor)
-        noise_score = min(1.0, snr / 10.0)
+        # If noise power is > 20% of signal power, it's getting bad
+        # ratio < 5 -> starts penalizing
         
-        return float(noise_score)
-        
+        if ratio > 10.0:
+            return 1.0
+        elif ratio < 1.0: # More noise than signal
+            return 0.0
+        else:
+            return ratio / 10.0
+            
     except Exception as e:
         logger.warning(f"Noise calculation failed: {e}")
         return 0.5

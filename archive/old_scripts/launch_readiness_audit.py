@@ -184,6 +184,9 @@ class LaunchReadinessAudit:
         # Patient generators per group
         self.generators: Dict[str, PatientGenerator] = {}
         
+        # Data buffers for pipeline (need history for detection)
+        self.buffers: Dict[str, Dict[str, np.ndarray]] = {}
+        
     def _setup_logging(self) -> logging.Logger:
         """Setup logging."""
         logger = logging.getLogger("LaunchReadinessAudit")
@@ -230,7 +233,18 @@ class LaunchReadinessAudit:
         return report
     
     def _init_generators(self):
-        """Initialize patient generators for each group."""
+        """
+        Initialize patient generators for each group and PRE-FILL buffers.
+        
+        CRITICAL: We must warm up the ring buffers with 20 minutes of history
+        so the analysis pipeline has enough context to run detection algorithms
+        immediately from Tick 0.
+        """
+        warmup_duration_min = 20
+        warmup_samples = int(warmup_duration_min * 60 * 4)  # 4Hz
+        
+        self.logger.info(f"   > Pre-filling {warmup_duration_min} mins of history ({warmup_samples} samples) per patient...")
+        
         for group_name, group_config in [
             ("GROUP_A", GROUP_A),
             ("GROUP_B", GROUP_B),
@@ -244,10 +258,18 @@ class LaunchReadinessAudit:
                     bed_number=int(patient_id[1:]),
                     baseline_fhr=group_config["config"].baseline_fhr,
                     baseline_variability=group_config["config"].baseline_variability,
-                    contractions_per_10min=4.0
+                    contractions_per_10min=4.0,
+                    buffer_duration_minutes=30.0  # Ensure buffer is large enough
                 )
                 
-                self.generators[patient_id] = PatientGenerator(cfg)
+                gen = PatientGenerator(cfg)
+                
+                # PRE-FILL / WARM-UP PHASE
+                # Generate 20 minutes of baseline data immediately
+                gen.generate_tick(n_samples=warmup_samples)
+                
+                self.generators[patient_id] = gen
+                
                 # Initialize metrics
                 self.patient_metrics[patient_id] = PatientMetrics(
                     patient_id=patient_id,
@@ -265,7 +287,7 @@ class LaunchReadinessAudit:
                     min_inference_ms=float('inf'),
                 )
         
-        self.logger.info(f"✓ Initialized {len(self.generators)} patient generators")
+        self.logger.info(f"✓ Initialized {len(self.generators)} patient generators with {warmup_duration_min}m history")
     
     def _run_simulation(self):
         """Run the 20-minute simulation loop."""
@@ -296,13 +318,17 @@ class LaunchReadinessAudit:
                     # Generate next second of data (4 samples at 4Hz)
                     sample = generator.generate_tick(n_samples=4)
                     
-                    # Process through pipeline
+                    # Get full buffer history from generator (pre-filled + current)
+                    # This ensures the pipeline always sees ~20 mins of context
+                    buffer_data = generator.get_buffer_data()
+                    
+                    # Process through pipeline using buffered data
                     inf_start = time.time()
                     result = self.adapter.process_patient(
                         patient_id=patient_id,
                         data={
-                            'fhr': sample['fhr'],
-                            'uc': sample['uc']
+                            'fhr': buffer_data['fhr'],
+                            'uc': buffer_data['uc']
                         },
                         run_moment=True
                     )
