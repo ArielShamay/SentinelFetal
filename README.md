@@ -54,6 +54,35 @@ python scripts/deep_endurance_audit.py
 
 ---
 
+## 🖥️ Running the UI (Central Station Dashboard)
+
+The V4 Central Station provides real-time monitoring of up to 20 patients at 4Hz refresh rate.
+
+### Windows
+```bash
+cd SentinelFetal
+.venv\Scripts\activate
+streamlit run src/ui/app.py
+```
+
+### Linux / macOS
+```bash
+cd SentinelFetal
+source .venv/bin/activate
+streamlit run src/ui/app.py
+```
+
+Then open **http://localhost:8501** in your browser.
+
+### UI Features
+- **Multi-Patient Grid**: Monitor up to 20 patients simultaneously
+- **Real-Time ECharts**: Dual-track CTG (FHR + UC) with 4Hz updates
+- **Category Badges**: Color-coded I/II/III classification
+- **God Mode**: Inject clinical events (Late Decel, Sinusoidal, etc.) for testing
+- **Detail View**: Click any patient for full 10-minute history with zoom
+
+---
+
 ## 🏗️ Architecture Overview
 
 ```
