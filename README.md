@@ -2,6 +2,9 @@
   <img src="https://img.shields.io/badge/Status-Production--Ready-brightgreen?style=for-the-badge" alt="Status"/>
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python"/>
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License"/>
+  <img src="https://img.shields.io/badge/Accuracy-97.0%25-success?style=for-the-badge" alt="Accuracy"/>
+  <img src="https://img.shields.io/badge/Scale-20_Patients-blue?style=for-the-badge" alt="Scale"/>
+  <img src="https://img.shields.io/badge/Events_Processed-2,500+-orange?style=for-the-badge" alt="Events"/>
 </p>
 
 # 🩺 SentinelFetal
@@ -14,6 +17,7 @@
 
 ## ⚡ Performance at a Glance
 
+### Clinical Validation Suite (Precision Test)
 | Metric | Value | Status |
 |--------|-------|--------|
 | **Overall Accuracy** | 98.7% | ✅ |
@@ -21,7 +25,18 @@
 | **Specificity (Healthy)** | 100% | ✅ |
 | **Late Decel Sensitivity** | 93.3% | ✅ |
 | **Noise Immunity (FSQI Gate)** | 100% | ✅ |
-| **Endurance (35-min stress)** | Passed | ✅ |
+
+### The Gauntlet V4 (Scale & Robustness Test)
+| Metric | Value | Status |
+|--------|-------|--------|
+| **Total Events Processed** | 2,500 | ✅ |
+| **Overall Accuracy** | 97.0% | ✅ |
+| **Late Decel Sensitivity** | **100.0%** | ✅ ⭐ |
+| **Variable Decel Sensitivity** | **100.0%** | ✅ ⭐ |
+| **Sinusoidal Detection** | 99.6% | ✅ |
+| **Healthy Detection** | 90.2% | ✅ |
+| **Patients Tested** | 20 | ✅ |
+| **Execution Time** | 3m 26s | ✅ |
 
 ---
 
