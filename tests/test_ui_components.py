@@ -310,47 +310,6 @@ class TestCategoryHelpers:
         assert get_category_emoji(3) == '🔴'
 
 
-class TestPlotFunctions:
-    """Tests for visualization functions."""
-    
-    def test_create_ctg_plot_returns_figure(self):
-        """Test CTG plot creation returns Plotly figure."""
-        from src.ui.plots import create_ctg_plot
-        import plotly.graph_objects as go
-        
-        fhr = np.random.normal(140, 10, 2400)
-        uc = np.random.normal(30, 10, 2400)
-        
-        fig = create_ctg_plot(fhr, uc)
-        
-        assert isinstance(fig, go.Figure)
-    
-    def test_create_ctg_plot_with_decelerations(self):
-        """Test CTG plot with deceleration markers."""
-        from src.ui.plots import create_ctg_plot
-        from src.rules.decelerations import Deceleration, DecelerationType
-        import plotly.graph_objects as go
-        
-        fhr = np.random.normal(140, 10, 2400)
-        uc = np.random.normal(30, 10, 2400)
-        
-        decel = Deceleration(
-            start_idx=100,
-            end_idx=200,
-            nadir_idx=150,
-            nadir_value=100,
-            depth=40,
-            duration_seconds=25,
-            decel_type=DecelerationType.LATE,
-            lag_seconds=15,
-            has_severity_signs=False
-        )
-        
-        fig = create_ctg_plot(fhr, uc, decelerations=[decel])
-        
-        assert isinstance(fig, go.Figure)
-
-
 class TestTrainDemoScript:
     """Tests for train_demo.py script."""
     
@@ -365,21 +324,9 @@ class TestTrainDemoScript:
         assert callable(train_demo_model)
 
 
-class TestAppImports:
-    """Tests for app.py imports and functions."""
-    
-    def test_app_module_imports(self):
-        """Test app.py can be imported."""
-        from src.ui import app
-        assert hasattr(app, 'main')
-        assert hasattr(app, 'run_full_pipeline')
-    
-    def test_plots_module_imports(self):
-        """Test plots.py can be imported."""
-        from src.ui import plots
-        assert hasattr(plots, 'create_ctg_plot')
-        assert hasattr(plots, 'create_category_indicator')
-    
+class TestAlertsModuleImports:
+    """Tests for alerts module imports."""
+
     def test_alerts_module_imports(self):
         """Test alerts.py can be imported."""
         from src.analysis import alerts
@@ -387,3 +334,29 @@ class TestAppImports:
         assert hasattr(alerts, 'generate_alert')
         assert hasattr(alerts, 'get_category_color')
         assert hasattr(alerts, 'get_category_emoji')
+
+
+class TestStateBridgeImports:
+    """Tests for state_bridge module imports (V3 architecture)."""
+
+    def test_state_bridge_imports_from_interfaces(self):
+        """Test state_bridge can be imported from src.interfaces."""
+        from src.interfaces.state_bridge import (
+            get_data_bridge,
+            DataBridge,
+            PatientSnapshot,
+            WardSnapshot,
+            HighlightRegion,
+        )
+        assert callable(get_data_bridge)
+        assert DataBridge is not None
+        assert PatientSnapshot is not None
+
+    def test_state_bridge_backwards_compat(self):
+        """Test backwards compatibility import from src.ui."""
+        from src.ui import (
+            get_data_bridge,
+            DataBridge,
+            PatientSnapshot,
+        )
+        assert callable(get_data_bridge)

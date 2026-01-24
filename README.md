@@ -1,17 +1,69 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Production--Ready-brightgreen?style=for-the-badge" alt="Status"/>
+  <img src="https://img.shields.io/badge/Backend-Production_Ready-success?style=for-the-badge" alt="Backend Status"/>
+  <img src="https://img.shields.io/badge/Frontend_V3-React-blue?style=for-the-badge" alt="Frontend Status"/>
+  <img src="https://img.shields.io/badge/Version-3.0-blue?style=for-the-badge" alt="Version"/>
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python"/>
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=white" alt="React"/>
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License"/>
   <img src="https://img.shields.io/badge/Accuracy-97.0%25-success?style=for-the-badge" alt="Accuracy"/>
   <img src="https://img.shields.io/badge/Scale-20_Patients-blue?style=for-the-badge" alt="Scale"/>
-  <img src="https://img.shields.io/badge/Events_Processed-2,500+-orange?style=for-the-badge" alt="Events"/>
 </p>
 
-# 🩺 SentinelFetal
+# SentinelFetal
 
 ### Real-Time Fetal Distress Detection Using Hybrid AI
 
 > **One-liner:** A production-grade CTG monitoring system that combines lightweight ML (MiniRocket) with deterministic clinical rules to classify fetal status in **under 60ms** with **98.7% accuracy**.
+
+## 🆕 V3.0 - Modern React Frontend
+
+V3.0 introduces a complete frontend rewrite with React, TypeScript, and real-time WebSocket streaming.
+
+### Quick Start (V3 Development)
+
+```bash
+# Backend (Terminal 1)
+cd SentinelFetal
+python -m venv .venv && .venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # Linux/macOS
+pip install -r requirements.txt
+uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+
+# Frontend (Terminal 2)
+cd frontend
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173** in your browser.
+
+### Quick Start (Docker - Production)
+
+```bash
+docker-compose up --build
+```
+
+Open **http://localhost** in your browser (frontend: 80, API: 8000).
+
+### V3 Tech Stack
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Zustand
+- **Charts**: lightweight-charts for real-time CTG visualization  
+- **i18n**: English & Hebrew with RTL support
+- **Backend**: FastAPI + WebSocket streaming (msgpack binary protocol)
+- **Testing**: Playwright E2E tests
+- **Deployment**: Docker + Nginx
+
+📄 Full migration status: [docs/V3_STATUS.md](docs/V3_STATUS.md)
+
+---
+
+## V2.0 New Features
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **MHR Guard** | Detects maternal heart rate contamination via spectral RSA analysis | Backend implemented — UI surfacing pending |
+| **Trend Analyzer** | 60-minute trend tracking with deterioration scoring (0-100) | Backend implemented — UI trend view pending |
+| **Explainability** | Rule-based explanations with visual graph highlighting | Backend implemented — front-end overlays pending |
 
 ---
 
@@ -69,25 +121,31 @@ python scripts/deep_endurance_audit.py
 
 ---
 
-## 🖥️ Running the UI (Central Station Dashboard)
+## 🖥️ Running the UI
 
-The V4 Central Station provides real-time monitoring of up to 20 patients at 4Hz refresh rate.
+### Development Mode
 
-### Windows
 ```bash
+# Backend (Terminal 1)
 cd SentinelFetal
-.venv\Scripts\activate
-streamlit run src/ui/app.py
+.venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # Linux/macOS
+uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+
+# Frontend (Terminal 2)
+cd frontend && npm run dev
 ```
 
-### Linux / macOS
-```bash
-cd SentinelFetal
-source .venv/bin/activate
-streamlit run src/ui/app.py
-```
+Then open **http://localhost:5173** in your browser.
 
-Then open **http://localhost:8501** in your browser.
+### Production Mode (Docker)
+
+```bash
+docker-compose up --build
+# Frontend: http://localhost (port 80)
+# API: http://localhost:8000
+# WebSocket: ws://localhost/ws/stream
+```
 
 ### UI Features
 - **Multi-Patient Grid**: Monitor up to 20 patients simultaneously
@@ -152,31 +210,52 @@ Then open **http://localhost:8501** in your browser.
 
 ```
 SentinelFetal/
-├── scripts/
-│   ├── clinical_validation_suite.py  # Accuracy testing
-│   └── deep_endurance_audit.py       # Stability testing
+├── api/                      # FastAPI Backend (V3)
+│   ├── main.py               # Application entry point
+│   ├── routers/              # REST + WebSocket routes
+│   ├── services/             # Business logic adapters
+│   └── models/               # Pydantic schemas
+├── frontend/                 # React Frontend (V3)
+│   ├── src/
+│   │   ├── components/       # React components (charts, panels)
+│   │   ├── pages/            # WardView, DetailView, Settings
+│   │   ├── store/            # Zustand state management
+│   │   ├── hooks/            # Custom React hooks
+│   │   └── i18n/             # Translations (EN/HE)
+│   ├── e2e/                  # Playwright E2E tests
+│   └── package.json
 ├── src/
-│   ├── data/           # Preprocessing, signal quality (FSQI)
-│   ├── models/         # MiniRocket, XGBoost, Fusion
-│   ├── rules/          # Baseline, Variability, Decelerations, etc.
-│   ├── analysis/       # Medical Override, Alert Generation
-│   ├── simulation/     # Real-time patient generator, RingBuffer
-│   └── pipeline/       # PipelineAdapter (orchestration)
+│   ├── interfaces/           # Abstract protocols + state bridge
+│   ├── data/                 # Preprocessing, FSQI quality gate
+│   ├── models/               # MiniRocket encoder, XGBoost
+│   ├── rules/                # FIGO/NICHD clinical rules
+│   ├── analysis/             # Trend analyzer, alerts
+│   ├── explainability/       # Rule + SHAP explainers
+│   ├── safety/               # MHR Guard module
+│   └── simulation/           # Patient generator, orchestrator
+├── scripts/                  # Validation & testing scripts
 ├── docs/
-│   ├── TECHNICAL_WHITEPAPER.md       # Deep technical documentation
-│   └── reports/
-│       ├── CLINICAL_VALIDATION_REPORT.md
-│       └── DEEP_ENDURANCE_REPORT.md
-└── tests/              # Unit & integration tests
+│   ├── V3_STATUS.md          # V3 migration status
+│   └── reports/              # Technical documentation
+├── docker-compose.yml        # Full-stack deployment
+├── Dockerfile.backend        # Python FastAPI image
+├── Dockerfile.frontend       # React + Nginx image
+└── tests/                    # Python unit tests
 ```
 
 ---
 
 ## 📚 Documentation
 
-- **[TECHNICAL_WHITEPAPER.md](docs/TECHNICAL_WHITEPAPER.md)** — Deep-dive into architecture, algorithms, and clinical logic
+### Status & Reality Check
+- **[STATUS.md](docs/STATUS.md)** — Current system state: Backend (Production Ready) vs. Frontend (Alpha/Broken)
+- **[UI_UX_GAP_ANALYSIS.md](docs/reports/UI_UX_GAP_ANALYSIS.md)** — Forensic audit of all UI defects with line numbers
+
+### Technical Documentation
+- **[TECHNICAL_WHITEPAPER.md](docs/reports/TECHNICAL_WHITEPAPER.md)** — Deep-dive into architecture, algorithms, and clinical logic (V2.0)
 - **[CLINICAL_VALIDATION_REPORT.md](docs/reports/CLINICAL_VALIDATION_REPORT.md)** — Accuracy & sensitivity results
 - **[DEEP_ENDURANCE_REPORT.md](docs/reports/DEEP_ENDURANCE_REPORT.md)** — 35-minute stability test results
+- **[SentinelFetal_V2_PRD_SPECS.md](docs/plan/SentinelFetal_V2_PRD_SPECS.md)** — V2.0 Product Requirements (Backend Implemented, UI Pending)
 
 ---
 

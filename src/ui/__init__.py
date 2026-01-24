@@ -1,35 +1,45 @@
 """
-UI Package for SentinelFetal Dashboard.
+UI Package - DEPRECATED.
 
-This package contains the Streamlit dashboard and visualization utilities.
+The SentinelFetal UI has migrated to React (frontend/) + FastAPI (api/).
+This package is maintained for backwards compatibility only.
 
-Components:
-    - app.py: Main Streamlit application
-    - plots.py: CTG visualization with WebGL Plotly
-    - styles.py: Professional CSS styling (hides Streamlit chrome)
-    - simulation_app.py: Real-time simulation dashboard
+State Bridge components have been moved to src/interfaces/state_bridge.py
+
+For new code, import from:
+    from src.interfaces.state_bridge import (
+        get_data_bridge,
+        DataBridge,
+        PatientSnapshot,
+        WardSnapshot,
+        HighlightRegion,
+        create_snapshot_from_pipeline_result,
+    )
 """
 
 from pathlib import Path
 
 UI_DIR = Path(__file__).parent
 
-# Export styles module
-from .styles import (
-    inject_custom_css,
-    COLORS,
-    category_banner_html,
-    finding_card_html,
-    recommendation_html,
-    section_header_html,
+# Re-export state_bridge components for backwards compatibility
+from src.interfaces.state_bridge import (
+    get_data_bridge,
+    reset_data_bridge,
+    DataBridge,
+    PatientSnapshot,
+    WardSnapshot,
+    HighlightRegion,
+    create_snapshot_from_pipeline_result,
 )
 
 __all__ = [
     'UI_DIR',
-    'inject_custom_css',
-    'COLORS',
-    'category_banner_html',
-    'finding_card_html',
-    'recommendation_html',
-    'section_header_html',
+    # State Bridge (from src.interfaces)
+    'get_data_bridge',
+    'reset_data_bridge',
+    'DataBridge',
+    'PatientSnapshot',
+    'WardSnapshot',
+    'HighlightRegion',
+    'create_snapshot_from_pipeline_result',
 ]

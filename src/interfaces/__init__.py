@@ -57,6 +57,17 @@ from .types import (
     CategoryLabel,
 )
 
+# State Bridge (thread-safe data sharing between backend and frontend)
+from .state_bridge import (
+    get_data_bridge,
+    reset_data_bridge,
+    DataBridge,
+    PatientSnapshot,
+    WardSnapshot,
+    HighlightRegion,
+    create_snapshot_from_pipeline_result,
+)
+
 __all__ = [
     # Data Layer
     'IDataLoader',
@@ -99,4 +110,13 @@ __all__ = [
     'EmbeddingVector',
     'FeatureVector',
     'CategoryLabel',
+
+    # State Bridge
+    'get_data_bridge',
+    'reset_data_bridge',
+    'DataBridge',
+    'PatientSnapshot',
+    'WardSnapshot',
+    'HighlightRegion',
+    'create_snapshot_from_pipeline_result',
 ]

@@ -1,0 +1,140 @@
+{
+  "app": {
+    "title": "SentinelFetal",
+    "version": "V3.0",
+    "subtitle": "Real-Time Fetal Monitoring"
+  },
+  "nav": {
+    "ward": "Ward View",
+    "detail": "Patient Detail",
+    "back": "Back to Ward"
+  },
+  "patient": {
+    "baseline": "Baseline",
+    "variability": "Variability",
+    "fhr": "FHR",
+    "uc": "Contractions",
+    "accelerations": "Accelerations",
+    "decelerations": "Decelerations",
+    "signalQuality": "Signal Quality",
+    "lastUpdate": "Last Update",
+    "viewDetails": "View Details"
+  },
+  "category": {
+    "label": "Category",
+    "1": "Normal",
+    "2": "Intermediate",
+    "3": "Pathological"
+  },
+  "alert": {
+    "headline1": "Green Alert - Category 1 (Normal)",
+    "headline2": "Orange Alert - Category 2 (Intermediate)",
+    "headline3": "Red Alert - Category 3 (Pathological)",
+    "mhrWarning": "MHR Contamination Suspected",
+    "bradycardia": "Bradycardia: FHR below 110 bpm",
+    "tachycardia": "Tachycardia: FHR above 160 bpm",
+    "reducedVariability": "Reduced variability",
+    "poorSignal": "Poor signal quality",
+    "pathologicalPattern": "Pathological CTG pattern",
+    "noAlerts": "No active alerts"
+  },
+  "recommendation": {
+    "normal": "Routine monitoring",
+    "intermediate": "Increased surveillance recommended",
+    "pathological": "Immediate clinical evaluation required"
+  },
+  "trend": {
+    "title": "Trend Analysis (60 min)",
+    "deteriorationScore": "Deterioration Score",
+    "variability": "Variability",
+    "increasing": "Increasing",
+    "decreasing": "Decreasing",
+    "stable": "Stable",
+    "decels30": "Decels (30 min)",
+    "lateDecels15": "Late Decels (15 min)",
+    "alert": "Trend Alert"
+  },
+  "explanation": {
+    "title": "Classification Explanation",
+    "why": "Why",
+    "primaryReason": "Primary Reason",
+    "factors": "Contributing Factors",
+    "confidence": "Confidence",
+    "noExplanation": "No explanation available"
+  },
+  "godmode": {
+    "title": "God Mode - Event Injection",
+    "eventType": "Event Type",
+    "severity": "Severity",
+    "mild": "Mild",
+    "moderate": "Moderate",
+    "severe": "Severe",
+    "duration": "Duration",
+    "target": "Target Patient",
+    "detection": "Expected Detection",
+    "inject": "Inject Event",
+    "injecting": "Injecting...",
+    "success": "Event injected successfully",
+    "error": "Failed to inject event",
+    "selectEvent": "Select event type...",
+    "selectPatient": "Select patient..."
+  },
+  "events": {
+    "LATE_DECEL": "Late Deceleration",
+    "VARIABLE_DECEL": "Variable Deceleration",
+    "PROLONGED_DECEL": "Prolonged Deceleration",
+    "TACHYCARDIA": "Tachycardia",
+    "BRADYCARDIA": "Bradycardia",
+    "MINIMAL_VARIABILITY": "Minimal Variability",
+    "SINUSOIDAL": "Sinusoidal Pattern",
+    "HYPERSTIM": "Hyperstimulation",
+    "RECOVERY": "Recovery"
+  },
+  "simulation": {
+    "status": "Status",
+    "running": "Running",
+    "paused": "Paused",
+    "stopped": "Stopped",
+    "start": "Start",
+    "pause": "Pause",
+    "resume": "Resume",
+    "reset": "Reset",
+    "patients": "Patients",
+    "patientCount": "Patient Count"
+  },
+  "connection": {
+    "connected": "Live",
+    "disconnected": "Offline",
+    "reconnecting": "Reconnecting...",
+    "status": "Connection Status"
+  },
+  "chart": {
+    "title": "CTG Monitor",
+    "fhr": "FHR",
+    "uc": "UC",
+    "live": "LIVE",
+    "fit": "Fit",
+    "timeRange": "Time Range"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "noData": "No data available",
+    "notFound": "Not found",
+    "seconds": "seconds",
+    "minutes": "minutes",
+    "bpm": "bpm",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "filters": {
+    "all": "All",
+    "search": "Search patients...",
+    "sortBy": "Sort by",
+    "category": "Category",
+    "patientId": "Patient ID",
+    "lastUpdate": "Last Update"
+  }
+}

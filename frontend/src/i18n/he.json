@@ -1,0 +1,140 @@
+{
+  "app": {
+    "title": "סנטינל עוברי",
+    "version": "V3.0",
+    "subtitle": "ניטור עוברי בזמן אמת"
+  },
+  "nav": {
+    "ward": "תצוגת מחלקה",
+    "detail": "פרטי מטופל",
+    "back": "חזרה למחלקה"
+  },
+  "patient": {
+    "baseline": "קו בסיס",
+    "variability": "וריאביליות",
+    "fhr": "דופק עוברי",
+    "uc": "התכווצויות",
+    "accelerations": "האצות",
+    "decelerations": "האטות",
+    "signalQuality": "איכות אות",
+    "lastUpdate": "עדכון אחרון",
+    "viewDetails": "צפה בפרטים"
+  },
+  "category": {
+    "label": "קטגוריה",
+    "1": "תקין",
+    "2": "בינוני",
+    "3": "פתולוגי"
+  },
+  "alert": {
+    "headline1": "התראה ירוקה - קטגוריה 1 (תקין)",
+    "headline2": "התראה כתומה - קטגוריה 2 (בינוני)",
+    "headline3": "התראה אדומה - קטגוריה 3 (פתולוגי)",
+    "mhrWarning": "חשד לזיהום דופק אימהי",
+    "bradycardia": "ברדיקרדיה: דופק עוברי מתחת ל-110",
+    "tachycardia": "טכיקרדיה: דופק עוברי מעל 160",
+    "reducedVariability": "וריאביליות מופחתת",
+    "poorSignal": "איכות אות ירודה",
+    "pathologicalPattern": "דפוס CTG פתולוגי",
+    "noAlerts": "אין התראות פעילות"
+  },
+  "recommendation": {
+    "normal": "מעקב שגרתי",
+    "intermediate": "הגברת מעקב מומלצת",
+    "pathological": "נדרשת הערכה קלינית מיידית"
+  },
+  "trend": {
+    "title": "ניתוח מגמות (60 דק')",
+    "deteriorationScore": "ציון התדרדרות",
+    "variability": "וריאביליות",
+    "increasing": "עולה",
+    "decreasing": "יורד",
+    "stable": "יציב",
+    "decels30": "האטות (30 דק')",
+    "lateDecels15": "האטות מאוחרות (15 דק')",
+    "alert": "התראת מגמה"
+  },
+  "explanation": {
+    "title": "הסבר סיווג",
+    "why": "למה",
+    "primaryReason": "סיבה עיקרית",
+    "factors": "גורמים תורמים",
+    "confidence": "רמת ודאות",
+    "noExplanation": "אין הסבר זמין"
+  },
+  "godmode": {
+    "title": "מצב אל - הזרקת אירועים",
+    "eventType": "סוג אירוע",
+    "severity": "חומרה",
+    "mild": "קל",
+    "moderate": "בינוני",
+    "severe": "חמור",
+    "duration": "משך",
+    "target": "מטופל יעד",
+    "detection": "זמן גילוי צפוי",
+    "inject": "הזרק אירוע",
+    "injecting": "מזריק...",
+    "success": "האירוע הוזרק בהצלחה",
+    "error": "נכשלה הזרקת האירוע",
+    "selectEvent": "בחר סוג אירוע...",
+    "selectPatient": "בחר מטופל..."
+  },
+  "events": {
+    "LATE_DECEL": "האטה מאוחרת",
+    "VARIABLE_DECEL": "האטה משתנה",
+    "PROLONGED_DECEL": "האטה ממושכת",
+    "TACHYCARDIA": "טכיקרדיה",
+    "BRADYCARDIA": "ברדיקרדיה",
+    "MINIMAL_VARIABILITY": "וריאביליות מינימלית",
+    "SINUSOIDAL": "דפוס סינוסואידי",
+    "HYPERSTIM": "היפר-סטימולציה",
+    "RECOVERY": "התאוששות"
+  },
+  "simulation": {
+    "status": "סטטוס",
+    "running": "פועל",
+    "paused": "מושהה",
+    "stopped": "עצור",
+    "start": "התחל",
+    "pause": "השהה",
+    "resume": "המשך",
+    "reset": "אתחל",
+    "patients": "מטופלים",
+    "patientCount": "מספר מטופלים"
+  },
+  "connection": {
+    "connected": "מחובר",
+    "disconnected": "מנותק",
+    "reconnecting": "מתחבר מחדש...",
+    "status": "סטטוס חיבור"
+  },
+  "chart": {
+    "title": "מוניטור CTG",
+    "fhr": "דופק עוברי",
+    "uc": "התכווצויות",
+    "live": "שידור חי",
+    "fit": "התאם",
+    "timeRange": "טווח זמן"
+  },
+  "common": {
+    "loading": "טוען...",
+    "error": "שגיאה",
+    "retry": "נסה שוב",
+    "noData": "אין נתונים זמינים",
+    "notFound": "לא נמצא",
+    "seconds": "שניות",
+    "minutes": "דקות",
+    "bpm": "פעימות/דק'",
+    "close": "סגור",
+    "save": "שמור",
+    "cancel": "בטל"
+  },
+  "filters": {
+    "all": "הכל",
+    "search": "חפש מטופלים...",
+    "sortBy": "מיין לפי",
+    "category": "קטגוריה",
+    "patientId": "מזהה מטופל",
+    "lastUpdate": "עדכון אחרון"
+  }
+}
