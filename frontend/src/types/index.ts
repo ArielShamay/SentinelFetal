@@ -168,7 +168,8 @@ export type Severity = 'mild' | 'moderate' | 'severe'
 export interface EventInjection {
   event_type: EventType
   severity: Severity
-  duration_seconds: number
+  duration_seconds?: number
+  duration_minutes?: number
   params?: Record<string, unknown>
 }
 

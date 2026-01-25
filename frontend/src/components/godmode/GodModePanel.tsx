@@ -2,23 +2,35 @@
  * God Mode Panel - Event injection interface for demonstrations
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { usePatientStore } from '../../stores'
 import { api } from '../../services'
 import type { EventType, Severity } from '../../types'
 
-// Event types with detection times
-const EVENT_TYPES: { id: EventType; detectionTime: number }[] = [
-  { id: 'LATE_DECEL', detectionTime: 15 },
-  { id: 'VARIABLE_DECEL', detectionTime: 10 },
-  { id: 'PROLONGED_DECEL', detectionTime: 8 },
-  { id: 'TACHYCARDIA', detectionTime: 20 },
-  { id: 'BRADYCARDIA', detectionTime: 5 },
-  { id: 'MINIMAL_VARIABILITY', detectionTime: 30 },
-  { id: 'SINUSOIDAL', detectionTime: 25 },
-  { id: 'HYPERSTIM', detectionTime: 12 },
+const EVENT_DETECTION_META: Record<EventType, { minMinutes: number; label: string; maxMinutes: number }> = {
+  LATE_DECEL: { minMinutes: 3, label: '3 Minutes (Recurrence Rule)', maxMinutes: 60 },
+  VARIABLE_DECEL: { minMinutes: 3, label: '3 Minutes (Recurrence Rule)', maxMinutes: 60 },
+  PROLONGED_DECEL: { minMinutes: 2, label: '2 Minutes', maxMinutes: 60 },
+  TACHYCARDIA: { minMinutes: 10, label: '10 Minutes', maxMinutes: 120 },
+  BRADYCARDIA: { minMinutes: 3, label: '3 Minutes', maxMinutes: 120 },
+  MINIMAL_VARIABILITY: { minMinutes: 10, label: '10 Minutes', maxMinutes: 120 },
+  SINUSOIDAL: { minMinutes: 10, label: '10 Minutes', maxMinutes: 60 },
+  HYPERSTIM: { minMinutes: 10, label: '10 Minutes', maxMinutes: 60 },
+  RECOVERY: { minMinutes: 2, label: '2 Minutes', maxMinutes: 60 },
+}
+
+const EVENT_TYPES: EventType[] = [
+  'LATE_DECEL',
+  'VARIABLE_DECEL',
+  'PROLONGED_DECEL',
+  'TACHYCARDIA',
+  'BRADYCARDIA',
+  'MINIMAL_VARIABILITY',
+  'SINUSOIDAL',
+  'HYPERSTIM',
+  'RECOVERY',
 ]
 
 interface GodModePanelProps {
@@ -35,7 +47,7 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
   const { t } = useTranslation()
   const [eventType, setEventType] = useState<EventType | ''>('')
   const [severity, setSeverity] = useState<Severity>('moderate')
-  const [duration, setDuration] = useState(120) // seconds
+  const [durationMinutes, setDurationMinutes] = useState(5)
   const [targetPatient, setTargetPatient] = useState<string>('')
   const [isInjecting, setIsInjecting] = useState(false)
 
@@ -81,8 +93,16 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
     }
   }, [patientOptions, targetPatient])
   
-  // Get detection time for selected event
-  const detectionTime = EVENT_TYPES.find(e => e.id === eventType)?.detectionTime ?? 0
+  const detectionMeta = eventType ? EVENT_DETECTION_META[eventType] : null
+
+  useEffect(() => {
+    if (!eventType) {
+      return
+    }
+
+    const minMinutes = EVENT_DETECTION_META[eventType].minMinutes
+    setDurationMinutes(minMinutes + 2)
+  }, [eventType])
 
   // Handle event injection
   const handleInject = useCallback(async () => {
@@ -97,7 +117,7 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
       await api.injectEvent(targetPatient, {
         event_type: eventType,
         severity,
-        duration_seconds: duration,
+        duration_minutes: durationMinutes,
       })
       
       toast.success(t('godmode.success'), {
@@ -116,7 +136,7 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
     } finally {
       setIsInjecting(false)
     }
-  }, [eventType, severity, duration, targetPatient, t])
+  }, [eventType, severity, durationMinutes, targetPatient, t])
 
   if (collapsed) {
     return (
@@ -167,8 +187,8 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
           >
             <option value="">{t('godmode.selectEvent')}</option>
             {EVENT_TYPES.map(event => (
-              <option key={event.id} value={event.id}>
-                {t(`events.${event.id}`)}
+              <option key={event} value={event}>
+                {t(`events.${event}`)}
               </option>
             ))}
           </select>
@@ -205,20 +225,21 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
         {/* Duration */}
         <div>
           <label className="block text-sm text-gray-600 mb-1">
-            {t('godmode.duration')}: {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')} min
+            {t('godmode.duration')}: {durationMinutes} min
           </label>
           <input
             type="range"
-            min={30}
-            max={600}
-            step={30}
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value))}
+            min={detectionMeta?.minMinutes ?? 1}
+            max={detectionMeta?.maxMinutes ?? 60}
+            step={1}
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(Number(e.target.value))}
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
+            disabled={!eventType}
           />
           <div className="flex justify-between text-xs text-gray-400 mt-1">
-            <span>30s</span>
-            <span>10min</span>
+            <span>{detectionMeta?.minMinutes ?? 1} min</span>
+            <span>{detectionMeta?.maxMinutes ?? 60} min</span>
           </div>
         </div>
 
@@ -240,10 +261,10 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
         </div>
 
         {/* Detection Time */}
-        {eventType && (
+        {eventType && detectionMeta && (
           <div className="p-2 bg-purple-50 rounded-lg text-center">
             <span className="text-sm text-gray-600">{t('godmode.detection')}: </span>
-            <span className="text-purple-700 font-mono font-medium">~{detectionTime}s</span>
+            <span className="text-purple-700 font-mono font-medium">{detectionMeta.label}</span>
           </div>
         )}
 

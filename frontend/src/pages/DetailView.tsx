@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePatientStore } from '../stores'
 import { CategoryBadge, CTGChart, ChartControls, TrendPanel, ExplanationPanel } from '../components'

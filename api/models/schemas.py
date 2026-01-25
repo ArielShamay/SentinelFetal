@@ -185,6 +185,7 @@ class EventInjection(BaseModel):
     event_type: EventTypeEnum = Field(..., description="Type of clinical event")
     severity: SeverityEnum = Field(default=SeverityEnum.MODERATE, description="Event severity")
     duration_seconds: int = Field(default=120, ge=30, le=600, description="Duration in seconds")
+    duration_minutes: Optional[float] = Field(default=None, ge=1, le=120, description="Duration in minutes")
     params: Optional[Dict[str, Any]] = Field(None, description="Additional event parameters")
 
 

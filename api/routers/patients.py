@@ -269,12 +269,16 @@ async def inject_event(
     # Inject the event
     params = event.params or {}
     params["severity"] = event.severity.value
+
+    duration_seconds = event.duration_seconds
+    if event.duration_minutes is not None:
+        duration_seconds = int(event.duration_minutes * 60)
     
     success = orchestrator.inject_event(
         patient_id=patient_id,
         event_type=event.event_type.value,
         params=params,
-        duration=event.duration_seconds,
+        duration=duration_seconds,
     )
     
     if success:

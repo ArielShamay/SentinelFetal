@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { usePatientStore, useUIStore } from '../stores'
 import { PatientCard, getCategoryPriority } from '../components'
 import type { Category, PatientSnapshot, WSPatientUpdate } from '../types'
@@ -40,9 +40,9 @@ export const WardView: React.FC = () => {
   const gridColumns = useUIStore(state => state.gridColumns)
   const setGridColumns = useUIStore(state => state.setGridColumns)
 
-  const [sortMode, setSortMode] = React.useState<SortMode>('category')
-  const [filterMode, setFilterMode] = React.useState<FilterMode>('all')
-  const [searchQuery, setSearchQuery] = React.useState('')
+  const [sortMode, setSortMode] = useState<SortMode>('category')
+  const [filterMode, setFilterMode] = useState<FilterMode>('all')
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Convert WSPatientUpdate Map to PatientSnapshot array and apply sorting/filtering
   const sortedPatients = useMemo(() => {

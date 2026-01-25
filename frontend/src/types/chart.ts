@@ -39,12 +39,11 @@ export interface ChartRefs {
 
 // Sparkline props
 export interface SparklineProps {
-  data: number[]
-  color?: string
+  fhrData: number[]
+  ucData?: number[]
+  timestamps?: number[]
   width?: number
   height?: number
-  animated?: boolean
-  showTrend?: boolean
   className?: string
 }
 

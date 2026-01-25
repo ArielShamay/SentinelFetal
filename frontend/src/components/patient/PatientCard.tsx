@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { PatientSnapshot, PatientSummary } from '../../types'
 import { CategoryBadge } from './CategoryBadge'
+import FHRSparkline from '../charts/FHRSparkline'
 
 interface PatientCardProps {
   patient: PatientSnapshot | PatientSummary
@@ -58,45 +58,7 @@ export const PatientCard: React.FC<PatientCardProps> = ({
   const signalQuality = isFullSnapshot(patient) ? patient.fsqi_score : undefined
   const lastUpdate = patient.last_update
 
-  // Generate SVG path for FHR trace
-  const fhrPath = useMemo(() => {
-    if (!fhrHistory || fhrHistory.length < 2) return ''
-    const width = compact ? 200 : 280
-    const height = compact ? 40 : 60
-    const padding = 4
-
-    const minVal = Math.min(...fhrHistory, 100)
-    const maxVal = Math.max(...fhrHistory, 180)
-    const range = maxVal - minVal || 1
-
-    const points = fhrHistory.map((val, i) => {
-      const x = padding + (i / (fhrHistory.length - 1)) * (width - 2 * padding)
-      const y = height - padding - ((val - minVal) / range) * (height - 2 * padding)
-      return `${x},${y}`
-    })
-
-    return `M ${points.join(' L ')}`
-  }, [fhrHistory, compact])
-
-  // Generate SVG path for UC trace
-  const ucPath = useMemo(() => {
-    if (!ucHistory || ucHistory.length < 2) return ''
-    const width = compact ? 200 : 280
-    const height = 30
-    const padding = 2
-
-    const minVal = 0
-    const maxVal = Math.max(...ucHistory, 100)
-    const range = maxVal - minVal || 1
-
-    const points = ucHistory.map((val, i) => {
-      const x = padding + (i / (ucHistory.length - 1)) * (width - 2 * padding)
-      const y = height - padding - ((val - minVal) / range) * (height - 2 * padding)
-      return `${x},${y}`
-    })
-
-    return `M ${points.join(' L ')}`
-  }, [ucHistory, compact])
+  const miniChartHeight = compact ? 90 : 160
 
   const borderColor = categoryBorderColors[category] || 'border-l-gray-400'
 
@@ -128,18 +90,14 @@ export const PatientCard: React.FC<PatientCardProps> = ({
           <CategoryBadge category={category} size="sm" showLabel={false} />
         </div>
 
-        {/* Mini FHR Chart */}
+        {/* Mini CTG Chart */}
         {fhrHistory.length > 1 && (
-          <svg width="100%" height="40" viewBox="0 0 200 40" preserveAspectRatio="none" className="mb-2">
-            <path
-              d={fhrPath}
-              fill="none"
-              stroke="#1E90FF"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <FHRSparkline
+            fhrData={fhrHistory}
+            ucData={ucHistory}
+            height={miniChartHeight}
+            className="mb-2"
+          />
         )}
 
         <div className="flex items-center justify-between text-xs">
@@ -188,55 +146,26 @@ export const PatientCard: React.FC<PatientCardProps> = ({
         <CategoryBadge category={category} size="md" />
       </div>
 
-      {/* FHR Chart Section */}
+      {/* CTG Chart Section */}
       <div className="p-4 bg-gray-50">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-gray-600">FHR (bpm)</span>
-          <span className="text-lg font-bold text-blue-600">{fhr?.toFixed(0) ?? '--'}</span>
+          <span className="text-xs font-medium text-gray-600">CTG</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-blue-600 font-semibold">{fhr?.toFixed(0) ?? '--'} bpm</span>
+            <span className="text-sm text-orange-600 font-semibold">{toco?.toFixed(0) ?? '--'} mmHg</span>
+          </div>
         </div>
 
         {fhrHistory.length > 1 ? (
-          <svg width="100%" height="60" viewBox="0 0 280 60" preserveAspectRatio="none" className="bg-white rounded border border-gray-200">
-            {/* Normal range band (110-160 bpm) */}
-            <rect x="0" y="15" width="280" height="30" fill="#e8f5e9" opacity="0.5" />
-
-            {/* FHR trace */}
-            <path
-              d={fhrPath}
-              fill="none"
-              stroke="#1E90FF"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <FHRSparkline
+            fhrData={fhrHistory}
+            ucData={ucHistory}
+            height={miniChartHeight}
+          />
         ) : (
-          <div className="h-[60px] bg-white rounded border border-gray-200 flex items-center justify-center text-gray-400 text-sm">
+          <div className="h-[160px] bg-white rounded border border-gray-200 flex items-center justify-center text-gray-400 text-sm">
             Waiting for data...
           </div>
-        )}
-      </div>
-
-      {/* UC Chart Section */}
-      <div className="px-4 pb-2">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium text-gray-600">UC (mmHg)</span>
-          <span className="text-sm font-bold text-orange-600">{toco?.toFixed(0) ?? '--'}</span>
-        </div>
-
-        {ucHistory.length > 1 ? (
-          <svg width="100%" height="30" viewBox="0 0 280 30" preserveAspectRatio="none" className="bg-white rounded border border-gray-200">
-            <path
-              d={ucPath}
-              fill="none"
-              stroke="#FF8C00"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        ) : (
-          <div className="h-[30px] bg-white rounded border border-gray-200" />
         )}
       </div>
 
