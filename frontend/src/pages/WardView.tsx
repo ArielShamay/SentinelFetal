@@ -106,6 +106,11 @@ export const WardView: React.FC = () => {
 
   return (
     <div className="p-4 bg-gray-50 min-h-screen">
+      {/* DEBUG INFO */}
+      <div id="debug-info" className="mb-2 p-2 bg-yellow-100 border border-yellow-400 text-sm font-mono">
+        Patients in store: {liveUpdates.size} | Sorted: {sortedPatients.length}
+      </div>
+      
       {/* Toolbar */}
       <div className="mb-6 flex flex-wrap items-center gap-4 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
         {/* Search */}

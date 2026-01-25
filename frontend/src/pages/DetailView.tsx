@@ -25,9 +25,16 @@ export const DetailView: React.FC = () => {
   // Check for MHR detection
   const isMHR = liveUpdate?.mhr_alert?.is_mhr ?? false
   
-  // Fetch full patient detail
+  // Fetch full patient detail (only if no live data available)
   useEffect(() => {
     if (!patientId) return
+    
+    // If we have live data from WebSocket, use it instead of fetching
+    const liveData = liveUpdate
+    if (liveData) {
+      setLoading(false)
+      return
+    }
     
     setLoading(true)
     setError(null)
@@ -38,10 +45,16 @@ export const DetailView: React.FC = () => {
         setLoading(false)
       })
       .catch((err: Error) => {
-        setError(err.message || 'Failed to load patient details')
-        setLoading(false)
+        // If API fails but we have WebSocket data, use that
+        if (liveUpdate) {
+          setLoading(false)
+          setError(null)
+        } else {
+          setError(err.message || 'Failed to load patient details')
+          setLoading(false)
+        }
       })
-  }, [patientId])
+  }, [patientId, liveUpdate])
   
   if (!patientId) {
     return <NotFoundState onBack={() => navigate('/')} />
@@ -51,12 +64,43 @@ export const DetailView: React.FC = () => {
     return <LoadingState />
   }
   
-  if (error) {
+  if (error && !liveUpdate) {
     return <ErrorState error={error} onRetry={() => window.location.reload()} />
   }
   
-  // Use real-time data from WebSocket, fallback to fetched detail
-  const currentData = patient ?? detail
+  // Use real-time data from WebSocket, or convert live update to snapshot format
+  let currentData = patient ?? detail
+  
+  // If we have live update but no full snapshot, create a minimal snapshot
+  if (!currentData && liveUpdate) {
+    const fhrHistory = liveUpdate.fhr_latest || []
+    const ucHistory = liveUpdate.uc_latest || []
+    currentData = {
+      patient_id: liveUpdate.patient_id,
+      bed_number: parseInt(liveUpdate.patient_id.replace(/\D/g, '')) || 0,
+      category: liveUpdate.category,
+      category_name: liveUpdate.category === 1 ? 'Normal' : liveUpdate.category === 2 ? 'Suspicious' : 'Pathological',
+      metrics: {
+        baseline_fhr: liveUpdate.baseline,
+        current_fhr: fhrHistory[fhrHistory.length - 1] ?? liveUpdate.baseline,
+        variability: liveUpdate.variability,
+        current_uc: ucHistory[ucHistory.length - 1] ?? 0,
+      },
+      fhr_history: fhrHistory,
+      uc_history: ucHistory,
+      timestamps: [],
+      alerts: [],
+      trend_data: null,
+      explanation: null,
+      fsqi_score: liveUpdate.fsqi,
+      has_active_event: false,
+      last_update: Date.now(),
+    } as PatientSnapshot
+  }
+  
+  if (!currentData) {
+    return <NotFoundState onBack={() => navigate('/')} />
+  }
   
   return (
     <div className="p-6 max-w-7xl mx-auto">

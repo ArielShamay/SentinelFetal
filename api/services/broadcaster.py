@@ -160,6 +160,15 @@ class AsyncBroadcaster:
 
         Called from the orchestrator bridge.
         """
+        # DEBUG: Log first few queues
+        if not hasattr(self, '_queue_count'):
+            self._queue_count = 0
+        self._queue_count += 1
+        
+        if self._queue_count <= 10:
+            patient_id = data.get('patient_id', 'unknown')
+            logger.info(f"📻 BROADCASTER: Queuing {patient_id}, count={self._queue_count}, queue={self._message_queue.qsize()}")
+        
         try:
             # Non-blocking put with timeout
             await asyncio.wait_for(
@@ -205,12 +214,25 @@ class AsyncBroadcaster:
         """Broadcast data to all connected clients."""
         from api.services.message_encoder import encode_message
 
+        # DEBUG: Log first few broadcasts
+        if not hasattr(self, '_broadcast_count'):
+            self._broadcast_count = 0
+        self._broadcast_count += 1
+        
+        # Log every 100 broadcasts to see activity
+        if self._broadcast_count % 100 == 0:
+            patient_id = data.get('patient_id', 'unknown')
+            logger.info(f"📣 _broadcast #{self._broadcast_count}: Sending {patient_id}, clients={len(self._clients)}")
+
         dead_clients: List[str] = []
 
         async with self._lock:
             clients = list(self._clients.items())
 
         if not clients:
+            # Log periodically if no clients
+            if self._broadcast_count % 100 == 0:
+                logger.warning(f"❌ No clients connected at broadcast #{self._broadcast_count}")
             return
 
         for client_id, client in clients:
@@ -224,13 +246,42 @@ class AsyncBroadcaster:
                 if filtered_data is None:
                     continue
 
-                # Encode and send
-                message = encode_message(filtered_data, client.message_format)
+                # Encode and send as JSON text
+                import json
+                import numpy as np
+                
+                # Custom encoder to handle numpy arrays
+                def convert_numpy(obj):
+                    if isinstance(obj, np.ndarray):
+                        return obj.tolist()
+                    elif isinstance(obj, np.integer):
+                        return int(obj)
+                    elif isinstance(obj, np.floating):
+                        return float(obj)
+                    elif isinstance(obj, dict):
+                        return {k: convert_numpy(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [convert_numpy(item) for item in obj]
+                    return obj
+                
+                # Convert numpy arrays recursively
+                filtered_data = convert_numpy(filtered_data)
+                
+                message = json.dumps(filtered_data)
                 await asyncio.wait_for(
-                    client.websocket.send_bytes(message),
+                    client.websocket.send_text(message),
                     timeout=0.5
                 )
                 client.message_count += 1
+                
+                # DEBUG: Log first few sends AND every 100
+                if self._broadcast_count <= 5 or self._broadcast_count % 100 == 0:
+                    logger.info(f"✉️ Sent to {client_id}: {len(message)} bytes")
+                    if self._broadcast_count <= 2:
+                        # Log message structure for first 2 messages
+                        logger.info(f"📦 Message structure: {list(filtered_data.keys())}")
+                        logger.info(f"📊 Message type: {filtered_data.get('type', 'unknown')}")
+                        logger.info(f"👤 Patient ID: {filtered_data.get('patient_id', 'unknown')}")
 
             except asyncio.TimeoutError:
                 logger.warning(f"Client {client_id} too slow, marking dead")

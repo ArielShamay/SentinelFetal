@@ -21,9 +21,8 @@ class WebSocketManager {
   private shouldReconnect = true
 
   constructor(url?: string) {
-    // Use relative WebSocket URL if not specified
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    this.url = url || `${wsProtocol}//${window.location.host}/ws/stream`
+    // Connect directly to backend on port 8001
+    this.url = url || 'ws://localhost:8001/ws/stream'
   }
 
   connect(): void {
@@ -50,22 +49,37 @@ class WebSocketManager {
 
     this.ws.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data) as WSMessage
-
-        // Handle connection message
-        if (data.type === 'connected' && data.client_id) {
-          console.log('Assigned client ID:', data.client_id)
-          this.clientId = data.client_id
-        }
-
-        // Handle ping - respond with pong
-        if (data.type === 'ping') {
-          this.sendPong()
+        // DEBUG: Check what we received
+        console.log('📥 WebSocket raw data:', typeof event.data, event.data instanceof Blob ? 'Blob' : event.data instanceof ArrayBuffer ? 'ArrayBuffer' : 'string')
+        
+        let data: WSMessage
+        
+        // Handle binary data (Blob or ArrayBuffer)
+        if (event.data instanceof Blob) {
+          // Convert Blob to text
+          event.data.text().then(text => {
+            try {
+              data = JSON.parse(text) as WSMessage
+              console.log('📥 WebSocket message (from Blob):', data.type, data)
+              this.processMessage(data)
+            } catch (error) {
+              console.error('Failed to parse Blob data:', error)
+            }
+          })
           return
+        } else if (event.data instanceof ArrayBuffer) {
+          // Convert ArrayBuffer to text
+          const decoder = new TextDecoder()
+          const text = decoder.decode(event.data)
+          data = JSON.parse(text) as WSMessage
+          console.log('📥 WebSocket message (from ArrayBuffer):', data.type, data)
+        } else {
+          // Plain text
+          data = JSON.parse(event.data) as WSMessage
+          console.log('📥 WebSocket message (from text):', data.type, data)
         }
 
-        // Forward to handler
-        this.messageHandler?.(data)
+        this.processMessage(data)
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error)
       }
@@ -83,6 +97,23 @@ class WebSocketManager {
     this.ws.onerror = (error) => {
       console.error('WebSocket error:', error)
     }
+  }
+
+  private processMessage(data: WSMessage): void {
+    // Handle connection message
+    if (data.type === 'connected' && data.client_id) {
+      console.log('Assigned client ID:', data.client_id)
+      this.clientId = data.client_id
+    }
+
+    // Handle ping - respond with pong
+    if (data.type === 'ping') {
+      this.sendPong()
+      return
+    }
+
+    // Forward to handler
+    this.messageHandler?.(data)
   }
 
   disconnect(): void {

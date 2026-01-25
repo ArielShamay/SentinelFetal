@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSimulation } from '../../hooks'
 import { usePatientStore } from '../../stores'
@@ -28,19 +28,35 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
   const currentPatientCount = usePatientStore(state => state.patientCount)
 
   const [patientCount, setLocalPatientCount] = useState(currentPatientCount || 10)
+  const debounceTimerRef = useRef<number>()
 
   const isRunning = simulationRunning && !simulationPaused
   const isPaused = simulationRunning && simulationPaused
   const isStopped = !simulationRunning
 
-  // Handle patient count change
+  // Handle patient count change with debouncing
   const handlePatientCountChange = useCallback(async (newCount: number) => {
     setLocalPatientCount(newCount)
-    // Only update backend if simulation is not running
-    if (isStopped) {
-      await updatePatientCount(newCount)
+    
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
     }
-  }, [isStopped, updatePatientCount])
+    
+    // Debounce API call by 500ms (waits for user to stop sliding)
+    debounceTimerRef.current = window.setTimeout(async () => {
+      await updatePatientCount(newCount)
+    }, 500)
+  }, [updatePatientCount])
+  
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [])
 
   // Start simulation with selected patient count
   const handleStart = useCallback(async () => {
@@ -57,8 +73,8 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
   
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      {/* Patient Count Selector - only show when stopped and not compact */}
-      {isStopped && !compact && (
+      {/* Patient Count Selector - always visible when not compact */}
+      {!compact && (
         <div className="flex items-center gap-2 bg-gray-100 border border-gray-300 rounded-md px-3 py-1.5">
           <label className="text-xs text-gray-600 whitespace-nowrap">
             Patients:

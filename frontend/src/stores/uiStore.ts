@@ -41,7 +41,7 @@ export const useUIStore = create<UIState>()(
       gridColumns: 4,
       showMiniCharts: true,
       showConnectionStatus: true,
-      godModeEnabled: false,
+      godModeEnabled: true,
 
       // Actions
       setTheme: (theme) => set({ theme }),

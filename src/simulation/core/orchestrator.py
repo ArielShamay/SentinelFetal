@@ -111,7 +111,8 @@ class SimulationOrchestrator:
     def __init__(
         self,
         config: Optional[OrchestratorConfig] = None,
-        processing_callback: Optional[Callable[[str, Dict], Dict]] = None
+        processing_callback: Optional[Callable[[str, Dict], Dict]] = None,
+        tick_callback: Optional[Callable[[Dict[str, Any]], None]] = None
     ):
         """
         Initialize the orchestrator.
@@ -121,9 +122,18 @@ class SimulationOrchestrator:
             processing_callback: Function called for each patient when MOMENT
                                processing is triggered. Signature:
                                callback(patient_id, data) -> results
+            tick_callback: Function called after each simulation tick with all
+                          patient data. Signature: callback(tick_data) -> None
         """
         self.config = config or OrchestratorConfig()
         self._processing_callback = processing_callback
+        self._tick_callback = tick_callback
+        
+        # DEBUG: Check if tick_callback was provided
+        if tick_callback:
+            logger.info(f"✅ TICK CALLBACK PROVIDED: {type(tick_callback).__name__}")
+        else:
+            logger.warning("❌ NO TICK CALLBACK PROVIDED!")
         
         # Patient generators
         self._patients: Dict[str, PatientGenerator] = {}
@@ -240,7 +250,7 @@ class SimulationOrchestrator:
         Dynamically change the number of patients.
 
         Stops simulation, recreates patients, and resets state.
-        Caller must restart simulation after this call.
+        Auto-restarts if simulation was running.
 
         Args:
             count: Number of patients (1-20, clamped).
@@ -277,10 +287,94 @@ class SimulationOrchestrator:
             self._logger = EventLogger(max_entries=1000)
 
         logger.info(f"Patient count changed to {count}")
-
-        # Optionally restart if it was running
+        
+        # Auto-restart if was running
         if was_running:
             self.start()
+            logger.info(f"Auto-restarted simulation with {count} patients")
+    
+    def resize_ward(self, new_count: int) -> None:
+        """
+        Resize the ward by adding or removing patients WITHOUT stopping simulation.
+        
+        If simulation is running, maintains state and just adjusts patient list.
+        This is the PREFERRED method for live patient count changes.
+        
+        Args:
+            new_count: Target number of patients (1-20, clamped).
+        """
+        new_count = max(1, min(20, new_count))
+        current_count = len(self._patients)
+        
+        if new_count == current_count:
+            return
+        
+        with self._lock:
+            if new_count > current_count:
+                # ADD patients
+                for i in range(current_count, new_count):
+                    patient_id = f"P{i+1}"
+                    name = self.config.patient_names[i % len(self.config.patient_names)]
+                    
+                    config = PatientConfig(
+                        patient_id=patient_id,
+                        bed_number=i + 1,
+                        name=name,
+                        baseline_fhr=np.random.uniform(130, 150),
+                        baseline_variability=np.random.uniform(8, 15),
+                        contractions_per_10min=np.random.uniform(3.5, 4.5)
+                    )
+                    
+                    self._patients[patient_id] = PatientGenerator(config)
+                    self._moment_schedule.append(patient_id)
+                    logger.info(f"Added patient {patient_id} (live resize)")
+                    
+            elif new_count < current_count:
+                # REMOVE patients (last ones first)
+                to_remove = [f"P{i+1}" for i in range(new_count, current_count)]
+                for patient_id in to_remove:
+                    if patient_id in self._patients:
+                        del self._patients[patient_id]
+                        if patient_id in self._moment_schedule:
+                            self._moment_schedule.remove(patient_id)
+                        logger.info(f"Removed patient {patient_id} (live resize)")
+            
+            # Update config
+            self.config.num_patients = new_count
+            
+            # Adjust MOMENT index if needed
+            if self._moment_index >= len(self._moment_schedule):
+                self._moment_index = 0
+        
+        logger.info(f"Ward resized from {current_count} to {new_count} patients")
+        
+        # Trigger immediate broadcast if DATA_BRIDGE is available (NOT CRITICAL - just for instant UI update)
+        # The main broadcast happens in the simulation loop
+        try:
+            if DATA_BRIDGE_AVAILABLE and new_count > current_count:
+                # Only broadcast new patients
+                bridge = get_data_bridge()
+                for i in range(current_count, new_count):
+                    patient_id = f"P{i+1}"
+                    if patient_id in self._patients:
+                        patient = self._patients[patient_id]
+                        # Generate initial tick
+                        fhr_samples, uc_samples = patient.generate_tick(
+                            int(self.config.sampling_rate * self.config.tick_interval_seconds)
+                        )
+                        
+                        # Create basic snapshot for immediate display
+                        snapshot = create_snapshot_from_pipeline_result(
+                            patient_id=patient_id,
+                            pipeline_result={'category': 1, 'confidence': 1.0, 'findings': {}},
+                            fhr_samples=fhr_samples,
+                            uc_samples=uc_samples,
+                            patient_config=patient.config,
+                            active_events=[],
+                        )
+                        bridge.update_patient(snapshot)
+        except Exception as e:
+            logger.debug(f"Non-critical: failed to broadcast after resize: {e}")
 
     @property
     def is_running(self) -> bool:
@@ -328,7 +422,8 @@ class SimulationOrchestrator:
         
         Each tick:
         1. Generates data for all patients (fast, ~1ms per patient)
-        2. Checks if it's time for MOMENT processing (staggered)
+        2. Calls tick_callback with current patient states
+        3. Checks if it's time for MOMENT processing (staggered)
         """
         with self._lock:
             samples_per_tick = int(
@@ -336,11 +431,45 @@ class SimulationOrchestrator:
             )
             
             # Generate data for all patients
-            for patient in self._patients.values():
+            for patient_id, patient in self._patients.items():
                 patient.generate_tick(samples_per_tick)
             
             self._simulation_time += self.config.tick_interval_seconds
             self._tick_count += 1
+            
+            # DEBUG: Check if callback is set
+            if self._tick_count <= 5:
+                logger.info(f"📊 Tick #{self._tick_count}: callback={'SET ✅' if self._tick_callback else 'NONE ❌'}")
+            
+            # Call tick callback if provided (for real-time updates)
+            if self._tick_callback:
+                try:
+                    # DEBUG: Log first few calls
+                    if self._tick_count <= 5:
+                        logger.info(f"🎯 Orchestrator calling tick_callback: tick={self._tick_count}")
+                    
+                    tick_data = {
+                        'simulation_time': self._simulation_time,
+                        'tick_count': self._tick_count,
+                        'patients': {}
+                    }
+                    
+                    # Add each patient's recent data
+                    for patient_id, patient in self._patients.items():
+                        # Get last few samples for real-time display
+                        recent_buffer = patient.get_buffer_data(duration_minutes=0.25)  # 15 seconds
+                        tick_data['patients'][patient_id] = {
+                            'fhr': recent_buffer.get('fhr', [])[-16:],  # Last 4 seconds
+                            'uc': recent_buffer.get('uc', [])[-16:],
+                            'baseline': patient.config.baseline_fhr,
+                            'variability': patient.config.baseline_variability,
+                            'category': getattr(patient, 'latest_category', 1),
+                        }
+                    
+                    self._tick_callback(tick_data)
+                except Exception as e:
+                    # Don't let callback errors stop simulation
+                    logger.error(f"❌ Tick callback error: {e}", exc_info=True)  # Always log with stack
             
             # Check for MOMENT processing (staggered)
             moment_interval = self.config.moment_per_patient_interval

@@ -59,6 +59,13 @@ class OrchestratorBridge:
         try:
             # Non-blocking put
             self._queue.put_nowait(data)
+            
+            # DEBUG: Log first few pushes
+            queue_size = self._queue.qsize()
+            if queue_size <= 10:
+                patient_id = data.get('patient_id', 'unknown')
+                logger.info(f"🌉 BRIDGE: Queued {patient_id}, queue={queue_size}")
+            
             return True
         except Full:
             # Queue full - drop oldest and retry
@@ -95,6 +102,8 @@ class OrchestratorBridge:
 
     async def _transfer_loop(self) -> None:
         """Transfer data from sync queue to async broadcaster."""
+        total_transferred = 0
+        
         while self._running:
             try:
                 # Check sync queue frequently
@@ -108,13 +117,19 @@ class OrchestratorBridge:
                         if self._broadcaster:
                             await self._broadcaster.queue_update(data)
                         messages_transferred += 1
+                        total_transferred += 1
+                        
+                        # DEBUG: Log first few transfers
+                        if total_transferred <= 10:
+                            patient_id = data.get('patient_id', 'unknown')
+                            logger.info(f"📡 BRIDGE → BROADCASTER: {patient_id}, total={total_transferred}")
                     except Empty:
                         break
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Transfer error: {e}")
+                logger.error(f"Transfer error: {e}", exc_info=True)
                 await asyncio.sleep(0.1)
 
     def get_queue_size(self) -> int:

@@ -91,9 +91,49 @@ class OrchestratorAdapter:
         self._orchestrator = SimulationOrchestrator(
             config=config,
             processing_callback=self._process_patient_data,
+            tick_callback=self._on_tick,
         )
         
         logger.info(f"OrchestratorAdapter initialized with {patient_count} patients")
+    
+    def _on_tick(self, tick_data: Dict[str, Any]) -> None:
+        """
+        Called on every simulation tick (1Hz).
+        Pushes real-time data to WebSocket clients.
+        """
+        try:
+            from api.services.orchestrator_bridge import push_to_websocket
+            
+            # DEBUG: Log first few ticks
+            tick_count = tick_data.get('tick_count', 0)
+            if tick_count <= 5:
+                logger.info(f"🔥 TICK CALLBACK: tick={tick_count}, patients={len(tick_data.get('patients', {}))}")
+            
+            # Push updates for each patient
+            for patient_id, patient_data in tick_data.get('patients', {}).items():
+                update = {
+                    "type": "patient_update",
+                    "timestamp": time.time(),
+                    "patient_id": patient_id,
+                    "category": patient_data.get('category', 1),
+                    "baseline": patient_data.get('baseline', 140),
+                    "variability": patient_data.get('variability', 10),
+                    "fhr_latest": patient_data.get('fhr', []),
+                    "uc_latest": patient_data.get('uc', []),
+                    "fsqi": 1.0,
+                    "confidence": 1.0,
+                    "findings": {},
+                }
+                
+                # DEBUG: Log first push
+                if tick_count <= 2:
+                    logger.info(f"🚀 Pushing patient {patient_id}: FHR={len(patient_data.get('fhr', []))} samples")
+                
+                push_to_websocket(update)
+                
+        except Exception as e:
+            # Don't let WebSocket errors affect simulation
+            logger.error(f"❌ Tick push error: {e}", exc_info=True)  # Always log with stack trace
     
     def _process_patient_data(self, patient_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -320,11 +360,16 @@ class OrchestratorAdapter:
     # =========================================================================
     
     def set_patient_count(self, count: int) -> None:
-        """Update patient count (requires restart)."""
+        """Update patient count and resize ward live if running."""
         count = max(1, min(20, count))
         self._patient_count = count
         if self._orchestrator:
-            self._orchestrator.set_patient_count(count)
+            # Use resize_ward for live changes when running
+            status = self.get_status()
+            if status.get('running', False):
+                self._orchestrator.resize_ward(count)
+            else:
+                self._orchestrator.set_patient_count(count)
     
     def set_speed(self, multiplier: float) -> None:
         """Set simulation speed multiplier."""

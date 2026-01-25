@@ -45,8 +45,9 @@ def _patient_to_snapshot(patient, patient_data: dict, orchestrator) -> PatientSn
     uc_data = patient_data.get("uc", [])
     timestamps = patient_data.get("timestamps", [])
     
-    current_fhr = fhr_data[-1] if fhr_data else 140.0
-    current_uc = uc_data[-1] if uc_data else 0.0
+    # Handle numpy arrays - check length instead of truthiness
+    current_fhr = fhr_data[-1] if len(fhr_data) > 0 else 140.0
+    current_uc = uc_data[-1] if len(uc_data) > 0 else 0.0
     
     # Get patient state
     category = patient_data.get("category", 1)

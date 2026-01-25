@@ -124,11 +124,23 @@ async def _handle_client_loop(
     while True:
         try:
             # Wait for message with timeout
-            data = await asyncio.wait_for(
-                websocket.receive_bytes(),
+            raw_data = await asyncio.wait_for(
+                websocket.receive(),
                 timeout=60.0
             )
-            message = decode_message(data, msg_format)
+            
+            # Handle different message types
+            if "bytes" in raw_data:
+                data = raw_data["bytes"]
+                message = decode_message(data, msg_format)
+            elif "text" in raw_data:
+                # Client sent text (JSON)
+                import json
+                message = json.loads(raw_data["text"])
+            else:
+                # Probably a disconnect or error
+                break
+                
             await _handle_client_message(client_id, message, broadcaster)
 
         except asyncio.TimeoutError:
@@ -137,10 +149,14 @@ async def _handle_client_loop(
                 break
             # Send ping to keep alive
             try:
-                ping = encode_message({"type": "ping", "timestamp": time.time()}, msg_format)
-                await websocket.send_bytes(ping)
+                import json
+                ping_msg = json.dumps({"type": "ping", "timestamp": time.time()})
+                await websocket.send_text(ping_msg)
             except Exception:
                 break
+        except Exception as e:
+            logger.error(f"Error in client loop for {client_id}: {e}")
+            break
 
 
 async def _handle_client_message(

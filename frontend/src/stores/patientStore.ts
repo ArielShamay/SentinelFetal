@@ -53,6 +53,13 @@ export const usePatientStore = create<PatientState>()(
 
       updateFromWebSocket: (update) =>
         set((state) => {
+          console.log('🔄 updateFromWebSocket called:', update.patient_id, 'FHR:', update.fhr_latest?.length, 'samples')
+          // DEBUG: Update DOM for debugging
+          const debugDiv = document.getElementById('debug-info')
+          if (debugDiv) {
+            debugDiv.innerHTML = `Patient: ${update.patient_id}, FHR samples: ${update.fhr_latest?.length}, Updates: ${state.liveUpdates.size + 1}`
+          }
+          
           const newUpdates = new Map(state.liveUpdates)
           newUpdates.set(update.patient_id, update)
           
@@ -69,6 +76,7 @@ export const usePatientStore = create<PatientState>()(
             })
           }
           
+          console.log('✅ Store updated, liveUpdates.size:', newUpdates.size)
           return { 
             liveUpdates: newUpdates, 
             patientSummaries: newSummaries,
