@@ -11,17 +11,31 @@ Usage:
     >>> override = apply_medical_override(ml_prediction=0, ...)
 """
 
-from .override import apply_medical_override, MedicalOverride, OverrideReason
-from .alerts import generate_alert, Alert, get_category_emoji, get_category_color
-
 __all__ = [
-    # Medical Override
-    'apply_medical_override',
-    'MedicalOverride',
-    'OverrideReason',
-    # Alerts
-    'generate_alert',
-    'Alert',
-    'get_category_emoji',
-    'get_category_color',
+    "apply_medical_override",
+    "MedicalOverride",
+    "OverrideReason",
+    "generate_alert",
+    "Alert",
+    "get_category_emoji",
+    "get_category_color",
 ]
+
+
+def __getattr__(name):
+    if name in {"apply_medical_override", "MedicalOverride", "OverrideReason"}:
+        from .override import apply_medical_override, MedicalOverride, OverrideReason
+        return {
+            "apply_medical_override": apply_medical_override,
+            "MedicalOverride": MedicalOverride,
+            "OverrideReason": OverrideReason,
+        }[name]
+    if name in {"generate_alert", "Alert", "get_category_emoji", "get_category_color"}:
+        from .alerts import generate_alert, Alert, get_category_emoji, get_category_color
+        return {
+            "generate_alert": generate_alert,
+            "Alert": Alert,
+            "get_category_emoji": get_category_emoji,
+            "get_category_color": get_category_color,
+        }[name]
+    raise AttributeError(name)

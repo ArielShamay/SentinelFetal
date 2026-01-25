@@ -28,6 +28,8 @@ from typing import Optional
 
 import numpy as np
 
+from src.analysis.fallback_audit import record_fallback
+
 from src.config import THRESHOLDS
 
 # Configure module logger
@@ -108,6 +110,30 @@ def calculate_baseline(
     # Validate input
     if fhr is None or len(fhr) == 0:
         raise BaselineCalculationError("Input FHR signal is empty or None")
+
+    def _fallback_stats(reason: str, extra: Optional[dict] = None) -> dict:
+        arr = np.asarray(fhr, dtype=float)
+        n = len(arr)
+        duration_min = n / sampling_rate / 60.0 if sampling_rate else float("inf")
+        nan_frac = float(np.mean(np.isnan(arr))) if n else 1.0
+        finite_vals = arr[np.isfinite(arr)]
+        finite_std = float(np.std(finite_vals)) if len(finite_vals) else 0.0
+        if len(finite_vals) > 1:
+            diffs = np.abs(np.diff(finite_vals))
+            flatline_ratio = float(np.mean(diffs < 1e-6))
+        else:
+            flatline_ratio = 1.0
+        stats = {
+            "n_samples": n,
+            "duration_min": duration_min,
+            "nan_frac": nan_frac,
+            "finite_std": finite_std,
+            "flatline_ratio": flatline_ratio,
+            "reason_detail": reason,
+        }
+        if extra:
+            stats.update(extra)
+        return stats
     
     # Calculate window parameters
     window_samples = int(window_minutes * 60 * sampling_rate)  # e.g., 2 min * 60 * 4 = 480
@@ -118,6 +144,11 @@ def calculate_baseline(
         logger.warning(
             f"Signal too short ({len(fhr)} samples) for {window_minutes}-minute window. "
             "Using global mean as fallback."
+        )
+        record_fallback(
+            "baseline",
+            "too_short",
+            _fallback_stats("window_too_short", {"window_minutes": window_minutes}),
         )
         return _calculate_fallback_baseline(fhr)
     
@@ -156,6 +187,11 @@ def calculate_baseline(
         logger.warning(
             f"No stable segment found (variability < {variability_threshold}). "
             "Using global mean as fallback."
+        )
+        record_fallback(
+            "baseline",
+            "no_stable_segment",
+            _fallback_stats("no_stable_segment", {"variability_threshold": variability_threshold}),
         )
         return _calculate_fallback_baseline(fhr)
     

@@ -1,0 +1,7 @@
+t_high: 0.2900000000000001
+t_low: 0.19000000000000009
+persistence_k: 2
+persistence_n: 3
+persistence_window_minutes: 15
+recall_guardrail: 0.8
+insufficient_windows: 0

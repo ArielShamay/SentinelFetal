@@ -1,0 +1,6 @@
+t_high: 0.6260783739954969
+t_low: 0.3000677077834031
+q_min: 0.7
+suspicious_rule: 0.5
+pathological_rule: 0.8
+source: calibrated_from_validation_negatives
