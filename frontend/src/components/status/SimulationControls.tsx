@@ -59,8 +59,8 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
     <div className={`flex items-center gap-2 ${className}`}>
       {/* Patient Count Selector - only show when stopped and not compact */}
       {isStopped && !compact && (
-        <div className="flex items-center gap-2 bg-gray-800 rounded-md px-3 py-1.5">
-          <label className="text-xs text-gray-400 whitespace-nowrap">
+        <div className="flex items-center gap-2 bg-gray-100 border border-gray-300 rounded-md px-3 py-1.5">
+          <label className="text-xs text-gray-600 whitespace-nowrap">
             Patients:
           </label>
           <input
@@ -69,9 +69,9 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
             max="20"
             value={patientCount}
             onChange={(e) => handlePatientCountChange(parseInt(e.target.value))}
-            className="w-20 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            className="w-20 h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
-          <span className="text-sm font-medium text-white w-6 text-center">
+          <span className="text-sm font-medium text-gray-900 w-6 text-center">
             {patientCount}
           </span>
         </div>
@@ -140,12 +140,12 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
       {/* Status indicator */}
       {!compact && (
         <span className={`text-xs font-medium px-2 py-1 rounded ${
-          isRunning ? 'bg-green-900/50 text-green-300' :
-          isPaused ? 'bg-yellow-900/50 text-yellow-300' :
-          'bg-gray-900/50 text-gray-400'
+          isRunning ? 'bg-green-100 text-green-700 border border-green-300' :
+          isPaused ? 'bg-yellow-100 text-yellow-700 border border-yellow-300' :
+          'bg-gray-100 text-gray-600 border border-gray-300'
         }`}>
-          {isRunning ? t('simulation.running').toUpperCase() : 
-           isPaused ? t('simulation.paused').toUpperCase() : 
+          {isRunning ? t('simulation.running').toUpperCase() :
+           isPaused ? t('simulation.paused').toUpperCase() :
            t('simulation.stopped').toUpperCase()}
         </span>
       )}

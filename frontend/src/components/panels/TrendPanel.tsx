@@ -48,8 +48,8 @@ export const TrendPanel: React.FC<TrendPanelProps> = ({
   }[trendData.variabilityTrend]
 
   return (
-    <div className={`bg-gray-800 rounded-xl p-4 border border-gray-700 ${className}`}>
-      <h3 className="text-md font-semibold text-white mb-4 flex items-center gap-2">
+    <div className={`bg-white rounded-xl p-4 border border-gray-200 shadow-sm ${className}`}>
+      <h3 className="text-md font-semibold text-gray-900 mb-4 flex items-center gap-2">
         <span>📊</span>
         {t('trend.title')}
       </h3>
@@ -57,10 +57,10 @@ export const TrendPanel: React.FC<TrendPanelProps> = ({
       {/* Deterioration Score */}
       <div className="mb-4">
         <div className="flex justify-between text-sm mb-1">
-          <span className="text-gray-400">{t('trend.deteriorationScore')}</span>
-          <span className="text-white font-mono">{trendData.deteriorationScore}</span>
+          <span className="text-gray-500">{t('trend.deteriorationScore')}</span>
+          <span className="text-gray-900 font-mono">{trendData.deteriorationScore}</span>
         </div>
-        <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
+        <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
           <div
             className={`h-full ${scoreColor} transition-all duration-500`}
             style={{ width: `${trendData.deteriorationScore}%` }}
@@ -69,14 +69,14 @@ export const TrendPanel: React.FC<TrendPanelProps> = ({
       </div>
 
       {/* Variability Trend */}
-      <div className="flex items-center justify-between py-2 border-b border-gray-700">
-        <span className="text-gray-400">{t('trend.variability')}</span>
-        <span className="flex items-center gap-1 text-white">
+      <div className="flex items-center justify-between py-2 border-b border-gray-200">
+        <span className="text-gray-500">{t('trend.variability')}</span>
+        <span className="flex items-center gap-1 text-gray-900">
           {trendIcon}
-          <span className={`text-sm ${
-            trendData.variabilityTrend === 'decreasing' ? 'text-yellow-400' :
-            trendData.variabilityTrend === 'increasing' ? 'text-green-400' :
-            'text-gray-300'
+          <span className={`text-sm font-medium ${
+            trendData.variabilityTrend === 'decreasing' ? 'text-yellow-600' :
+            trendData.variabilityTrend === 'increasing' ? 'text-green-600' :
+            'text-gray-500'
           }`}>
             {t(`trend.${trendData.variabilityTrend}`)}
           </span>
@@ -84,15 +84,15 @@ export const TrendPanel: React.FC<TrendPanelProps> = ({
       </div>
 
       {/* Deceleration Counts */}
-      <div className="space-y-2 py-2 border-b border-gray-700">
+      <div className="space-y-2 py-2 border-b border-gray-200">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-400">{t('trend.decels30')}</span>
-          <span className="text-white font-mono">{trendData.decelsIn30min}</span>
+          <span className="text-gray-500">{t('trend.decels30')}</span>
+          <span className="text-gray-900 font-mono">{trendData.decelsIn30min}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-400">{t('trend.lateDecels15')}</span>
+          <span className="text-gray-500">{t('trend.lateDecels15')}</span>
           <span className={`font-mono ${
-            trendData.lateDecelsIn15min > 0 ? 'text-red-400' : 'text-white'
+            trendData.lateDecelsIn15min > 0 ? 'text-red-600' : 'text-gray-900'
           }`}>
             {trendData.lateDecelsIn15min}
             {trendData.lateDecelsIn15min > 0 && ' ⚠️'}
@@ -106,7 +106,7 @@ export const TrendPanel: React.FC<TrendPanelProps> = ({
           {trendData.alerts.map((alert, idx) => (
             <div
               key={idx}
-              className="flex items-start gap-2 text-sm text-yellow-300 bg-yellow-900/20 p-2 rounded"
+              className="flex items-start gap-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 p-2 rounded"
             >
               <span>⚠️</span>
               <span>{alert}</span>

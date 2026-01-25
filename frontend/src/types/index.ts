@@ -92,6 +92,15 @@ export interface PatientSummary {
   last_update: number
 }
 
+// MHR Detection result
+export interface MHRAlert {
+  is_mhr: boolean
+  confidence: number
+  recommended_action: 'NONE' | 'FLAG' | 'WARN' | 'BLOCK_SEGMENT'
+  detection_methods: string[]
+  message?: string
+}
+
 // WebSocket update (streaming)
 export interface WSPatientUpdate {
   patient_id: string
@@ -103,6 +112,10 @@ export interface WSPatientUpdate {
   fsqi: number
   confidence: number
   findings: Record<string, unknown>
+  // V2.0 fields
+  mhr_alert?: MHRAlert | null
+  trend_score?: number
+  trend_slope?: number
 }
 
 // Simulation status

@@ -13,9 +13,9 @@ export function Layout() {
   const showSidebarToggle = location.pathname === '/' && godModeEnabled
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Header 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+    <div className="min-h-screen bg-white">
+      <Header
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         showSidebarToggle={showSidebarToggle}
         sidebarOpen={sidebarOpen}
       />
@@ -26,22 +26,22 @@ export function Layout() {
             <Outlet />
           </div>
         </main>
-        
+
         {/* Sidebar - God Mode Panel */}
         {showSidebarToggle && (
-          <aside 
+          <aside
             className={`
-              fixed right-0 top-16 bottom-0 w-80 bg-gray-800 border-l border-gray-700
-              transform transition-transform duration-300 overflow-y-auto
+              fixed right-0 top-16 bottom-0 w-80 bg-gray-100 border-l border-gray-300
+              transform transition-transform duration-300 overflow-y-auto shadow-lg
               ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}
             `}
           >
             <div className="p-4">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-white">God Mode</h2>
-                <button 
+                <h2 className="text-lg font-semibold text-gray-900">God Mode</h2>
+                <button
                   onClick={() => setSidebarOpen(false)}
-                  className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white"
+                  className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-900"
                 >
                   ✕
                 </button>

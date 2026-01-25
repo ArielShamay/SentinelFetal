@@ -83,8 +83,8 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
       <button
         onClick={onToggle}
         className={`
-          flex items-center gap-2 p-3 bg-purple-900/30 border border-purple-700/50
-          rounded-lg text-purple-300 hover:bg-purple-900/50 transition-colors
+          flex items-center gap-2 p-3 bg-purple-50 border border-purple-300
+          rounded-lg text-purple-700 hover:bg-purple-100 transition-colors
           ${className}
         `}
       >
@@ -96,20 +96,20 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
   }
 
   return (
-    <div className={`bg-gray-800 rounded-xl border border-purple-700/50 overflow-hidden ${className}`}>
+    <div className={`bg-white rounded-xl border border-purple-200 shadow-sm overflow-hidden ${className}`}>
       {/* Header */}
-      <div 
-        className="flex items-center justify-between p-4 bg-purple-900/30 cursor-pointer"
+      <div
+        className="flex items-center justify-between p-4 bg-purple-50 cursor-pointer"
         onClick={onToggle}
       >
         <div className="flex items-center gap-2">
           <span className="text-xl">⚡</span>
-          <h3 className="text-lg font-semibold text-purple-200">
+          <h3 className="text-lg font-semibold text-purple-800">
             {t('godmode.title')}
           </h3>
         </div>
         {onToggle && (
-          <button className="text-purple-400 hover:text-purple-200">▲</button>
+          <button className="text-purple-500 hover:text-purple-700">▲</button>
         )}
       </div>
 
@@ -117,13 +117,13 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
       <div className="p-4 space-y-4">
         {/* Event Type */}
         <div>
-          <label className="block text-sm text-gray-400 mb-1">
+          <label className="block text-sm text-gray-600 mb-1">
             {t('godmode.eventType')}
           </label>
           <select
             value={eventType}
             onChange={(e) => setEventType(e.target.value as EventType | '')}
-            className="w-full p-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           >
             <option value="">{t('godmode.selectEvent')}</option>
             {EVENT_TYPES.map(event => (
@@ -136,7 +136,7 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
 
         {/* Severity */}
         <div>
-          <label className="block text-sm text-gray-400 mb-2">
+          <label className="block text-sm text-gray-600 mb-2">
             {t('godmode.severity')}
           </label>
           <div className="flex gap-4">
@@ -150,10 +150,10 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
                   onChange={() => setSeverity(sev)}
                   className="text-purple-500 focus:ring-purple-500"
                 />
-                <span className={`text-sm ${
-                  sev === 'mild' ? 'text-green-400' :
-                  sev === 'moderate' ? 'text-yellow-400' :
-                  'text-red-400'
+                <span className={`text-sm font-medium ${
+                  sev === 'mild' ? 'text-green-600' :
+                  sev === 'moderate' ? 'text-yellow-600' :
+                  'text-red-600'
                 }`}>
                   {t(`godmode.${sev}`)}
                 </span>
@@ -164,7 +164,7 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
 
         {/* Duration */}
         <div>
-          <label className="block text-sm text-gray-400 mb-1">
+          <label className="block text-sm text-gray-600 mb-1">
             {t('godmode.duration')}: {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')} min
           </label>
           <input
@@ -174,9 +174,9 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
             step={30}
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
             <span>30s</span>
             <span>10min</span>
           </div>
@@ -184,13 +184,13 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
 
         {/* Target Patient */}
         <div>
-          <label className="block text-sm text-gray-400 mb-1">
+          <label className="block text-sm text-gray-600 mb-1">
             {t('godmode.target')}
           </label>
           <select
             value={targetPatient}
             onChange={(e) => setTargetPatient(e.target.value)}
-            className="w-full p-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           >
             <option value="">{t('godmode.selectPatient')}</option>
             {patients.map(id => (
@@ -201,9 +201,9 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
 
         {/* Detection Time */}
         {eventType && (
-          <div className="p-2 bg-purple-900/20 rounded-lg text-center">
-            <span className="text-sm text-gray-400">{t('godmode.detection')}: </span>
-            <span className="text-purple-300 font-mono">~{detectionTime}s</span>
+          <div className="p-2 bg-purple-50 rounded-lg text-center">
+            <span className="text-sm text-gray-600">{t('godmode.detection')}: </span>
+            <span className="text-purple-700 font-mono font-medium">~{detectionTime}s</span>
           </div>
         )}
 
@@ -216,7 +216,7 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
             flex items-center justify-center gap-2
             transition-all duration-200
             ${isInjecting || !eventType || !targetPatient
-              ? 'bg-gray-700 cursor-not-allowed opacity-50'
+              ? 'bg-gray-300 cursor-not-allowed opacity-50'
               : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 shadow-lg hover:shadow-purple-500/25'
             }
           `}

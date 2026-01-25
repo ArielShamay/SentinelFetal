@@ -1,8 +1,7 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { PatientSnapshot, PatientSummary } from '../../types'
 import { CategoryBadge } from './CategoryBadge'
-import { FHRSparkline } from '../charts'
 
 interface PatientCardProps {
   patient: PatientSnapshot | PatientSummary
@@ -11,6 +10,10 @@ interface PatientCardProps {
   className?: string
   /** Optional recent FHR values for sparkline display */
   fhrHistory?: number[]
+  /** Optional recent UC values */
+  ucHistory?: number[]
+  /** MHR detection warning */
+  isMHR?: boolean
 }
 
 // Type guard to check if patient is a full snapshot
@@ -18,15 +21,24 @@ const isFullSnapshot = (patient: PatientSnapshot | PatientSummary): patient is P
   return 'metrics' in patient
 }
 
-export const PatientCard: React.FC<PatientCardProps> = ({ 
-  patient, 
+// Category border colors for medical monitors
+const categoryBorderColors: Record<number, string> = {
+  1: 'border-l-green-500',
+  2: 'border-l-yellow-500',
+  3: 'border-l-red-500',
+}
+
+export const PatientCard: React.FC<PatientCardProps> = ({
+  patient,
   compact = false,
   onClick,
   className = '',
   fhrHistory = [],
+  ucHistory = [],
+  isMHR = false,
 }) => {
   const navigate = useNavigate()
-  
+
   const handleClick = () => {
     if (onClick) {
       onClick()
@@ -34,10 +46,10 @@ export const PatientCard: React.FC<PatientCardProps> = ({
       navigate(`/patient/${patient.patient_id}`)
     }
   }
-  
+
   const category = patient.category
   const isPathological = category === 3
-  
+
   // Extract metrics based on type
   const fhr = isFullSnapshot(patient) ? patient.metrics.current_fhr : patient.current_fhr
   const baseline = isFullSnapshot(patient) ? patient.metrics.baseline_fhr : patient.baseline_fhr
@@ -45,116 +57,219 @@ export const PatientCard: React.FC<PatientCardProps> = ({
   const toco = isFullSnapshot(patient) ? patient.metrics.current_uc : undefined
   const signalQuality = isFullSnapshot(patient) ? patient.fsqi_score : undefined
   const lastUpdate = patient.last_update
-  
-  // Get border color based on category
-  const borderColor = {
-    1: 'border-green-700/50 hover:border-green-600',
-    2: 'border-yellow-700/50 hover:border-yellow-600',
-    3: 'border-red-700/50 hover:border-red-600 ring-1 ring-red-500/30'
-  }[category] ?? 'border-gray-700/50 hover:border-gray-600'
-  
+
+  // Generate SVG path for FHR trace
+  const fhrPath = useMemo(() => {
+    if (!fhrHistory || fhrHistory.length < 2) return ''
+    const width = compact ? 200 : 280
+    const height = compact ? 40 : 60
+    const padding = 4
+
+    const minVal = Math.min(...fhrHistory, 100)
+    const maxVal = Math.max(...fhrHistory, 180)
+    const range = maxVal - minVal || 1
+
+    const points = fhrHistory.map((val, i) => {
+      const x = padding + (i / (fhrHistory.length - 1)) * (width - 2 * padding)
+      const y = height - padding - ((val - minVal) / range) * (height - 2 * padding)
+      return `${x},${y}`
+    })
+
+    return `M ${points.join(' L ')}`
+  }, [fhrHistory, compact])
+
+  // Generate SVG path for UC trace
+  const ucPath = useMemo(() => {
+    if (!ucHistory || ucHistory.length < 2) return ''
+    const width = compact ? 200 : 280
+    const height = 30
+    const padding = 2
+
+    const minVal = 0
+    const maxVal = Math.max(...ucHistory, 100)
+    const range = maxVal - minVal || 1
+
+    const points = ucHistory.map((val, i) => {
+      const x = padding + (i / (ucHistory.length - 1)) * (width - 2 * padding)
+      const y = height - padding - ((val - minVal) / range) * (height - 2 * padding)
+      return `${x},${y}`
+    })
+
+    return `M ${points.join(' L ')}`
+  }, [ucHistory, compact])
+
+  const borderColor = categoryBorderColors[category] || 'border-l-gray-400'
+
   if (compact) {
     return (
-      <div 
+      <div
         onClick={handleClick}
         className={`
-          bg-gray-800 rounded-lg border ${borderColor}
+          monitor-card bg-white rounded-lg border border-gray-200 border-l-4 ${borderColor}
           p-3 cursor-pointer transition-all duration-200
-          hover:bg-gray-750 hover:shadow-lg
+          hover:shadow-md
           ${isPathological ? 'animate-pulse-subtle' : ''}
+          ${isMHR ? 'ring-2 ring-orange-400' : ''}
           ${className}
         `}
       >
-        <div className="flex items-center justify-between">
-          <span className="font-medium text-white text-sm">
+        {/* MHR Warning Banner */}
+        {isMHR && (
+          <div className="bg-orange-100 text-orange-800 text-xs font-semibold px-2 py-1 rounded mb-2 flex items-center gap-1">
+            <span>⚠️</span>
+            <span>MHR DETECTED</span>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mb-2">
+          <span className="font-semibold text-gray-900 text-sm">
             {patient.patient_id}
           </span>
           <CategoryBadge category={category} size="sm" showLabel={false} />
         </div>
-        <div className="mt-1 flex items-center gap-2 text-xs text-gray-400">
-          <span>FHR: {fhr?.toFixed(0) ?? '--'}</span>
-          <span>•</span>
-          <span>UC: {toco?.toFixed(0) ?? '--'}</span>
+
+        {/* Mini FHR Chart */}
+        {fhrHistory.length > 1 && (
+          <svg width="100%" height="40" viewBox="0 0 200 40" preserveAspectRatio="none" className="mb-2">
+            <path
+              d={fhrPath}
+              fill="none"
+              stroke="#1E90FF"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-600">
+            <span className="font-medium text-blue-600">{fhr?.toFixed(0) ?? '--'}</span> bpm
+          </span>
+          <span className="text-gray-600">
+            UC: <span className="font-medium text-orange-600">{toco?.toFixed(0) ?? '--'}</span>
+          </span>
         </div>
       </div>
     )
   }
-  
+
   return (
-    <div 
+    <div
       onClick={handleClick}
       className={`
-        bg-gray-800 rounded-xl border-2 ${borderColor}
-        p-4 cursor-pointer transition-all duration-200
-        hover:bg-gray-750 hover:shadow-xl hover:scale-[1.02]
-        ${isPathological ? 'animate-pulse-subtle' : ''}
+        monitor-card bg-white rounded-lg border border-gray-200 border-l-4 ${borderColor}
+        cursor-pointer transition-all duration-200
+        hover:shadow-lg
+        ${isPathological ? 'ring-2 ring-red-200' : ''}
+        ${isMHR ? 'ring-2 ring-orange-400' : ''}
         ${className}
       `}
     >
+      {/* MHR Warning Banner */}
+      {isMHR && (
+        <div className="bg-orange-100 border-b border-orange-200 text-orange-800 text-sm font-semibold px-4 py-2 flex items-center gap-2">
+          <span className="text-lg">⚠️</span>
+          <div>
+            <span className="block">MATERNAL PULSE DETECTED</span>
+            <span className="text-xs font-normal text-orange-600">Signal may be contaminated with maternal heart rate</span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-white text-lg">
-          {patient.patient_id}
-        </h3>
+      <div className="flex items-center justify-between p-4 border-b border-gray-100">
+        <div>
+          <h3 className="font-bold text-gray-900 text-lg">
+            {patient.patient_id}
+          </h3>
+          <span className="text-xs text-gray-500">Bed #{isFullSnapshot(patient) ? patient.bed_number : '--'}</span>
+        </div>
         <CategoryBadge category={category} size="md" />
       </div>
-      
+
+      {/* FHR Chart Section */}
+      <div className="p-4 bg-gray-50">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-gray-600">FHR (bpm)</span>
+          <span className="text-lg font-bold text-blue-600">{fhr?.toFixed(0) ?? '--'}</span>
+        </div>
+
+        {fhrHistory.length > 1 ? (
+          <svg width="100%" height="60" viewBox="0 0 280 60" preserveAspectRatio="none" className="bg-white rounded border border-gray-200">
+            {/* Normal range band (110-160 bpm) */}
+            <rect x="0" y="15" width="280" height="30" fill="#e8f5e9" opacity="0.5" />
+
+            {/* FHR trace */}
+            <path
+              d={fhrPath}
+              fill="none"
+              stroke="#1E90FF"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : (
+          <div className="h-[60px] bg-white rounded border border-gray-200 flex items-center justify-center text-gray-400 text-sm">
+            Waiting for data...
+          </div>
+        )}
+      </div>
+
+      {/* UC Chart Section */}
+      <div className="px-4 pb-2">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-medium text-gray-600">UC (mmHg)</span>
+          <span className="text-sm font-bold text-orange-600">{toco?.toFixed(0) ?? '--'}</span>
+        </div>
+
+        {ucHistory.length > 1 ? (
+          <svg width="100%" height="30" viewBox="0 0 280 30" preserveAspectRatio="none" className="bg-white rounded border border-gray-200">
+            <path
+              d={ucPath}
+              fill="none"
+              stroke="#FF8C00"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : (
+          <div className="h-[30px] bg-white rounded border border-gray-200" />
+        )}
+      </div>
+
       {/* Vitals Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <VitalDisplay 
-          label="FHR" 
-          value={fhr} 
-          unit="bpm"
-          alert={fhr != null && (fhr < 110 || fhr > 160)}
-        />
-        <VitalDisplay 
-          label="Contractions" 
-          value={toco} 
-          unit=""
-          alert={toco != null && toco > 80}
-        />
-        <VitalDisplay 
-          label="Baseline" 
-          value={baseline} 
+      <div className="grid grid-cols-3 gap-2 p-4 pt-2 border-t border-gray-100">
+        <VitalDisplay
+          label="Baseline"
+          value={baseline}
           unit="bpm"
         />
-        <VitalDisplay 
-          label="Variability" 
-          value={variability} 
-          unit=""
+        <VitalDisplay
+          label="Variability"
+          value={variability}
+          unit="bpm"
+        />
+        <VitalDisplay
+          label="Signal"
+          value={signalQuality != null ? signalQuality * 100 : undefined}
+          unit="%"
+          alert={signalQuality != null && signalQuality < 0.7}
         />
       </div>
-      
-      {/* Signal Quality */}
-      {signalQuality != null && (
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-500">Signal Quality</span>
-          <SignalQualityBar quality={signalQuality} />
-        </div>
-      )}
-      
-      {/* FHR Sparkline */}
-      {fhrHistory.length > 1 && (
-        <div className="mt-3 pt-3 border-t border-gray-700/50">
-          <FHRSparkline 
-            data={fhrHistory.slice(-60)} 
-            width={160} 
-            height={36}
-            showTrend={true}
-            className="mx-auto"
-          />
-        </div>
-      )}
-      
-      {/* Timestamp */}
-      <div className="mt-2 text-xs text-gray-500 text-right">
-        {formatTimestamp(lastUpdate)}
+
+      {/* Footer */}
+      <div className="px-4 pb-3 flex items-center justify-between text-xs text-gray-500">
+        <span>{formatTimestamp(lastUpdate)}</span>
+        <span className="text-blue-600 hover:text-blue-800">View Details →</span>
       </div>
     </div>
   )
 }
 
-// Vital display component
+// Vital display component - Light theme
 interface VitalDisplayProps {
   label: string
   value?: number | null
@@ -162,45 +277,27 @@ interface VitalDisplayProps {
   alert?: boolean
 }
 
-const VitalDisplay: React.FC<VitalDisplayProps> = ({ label, value, unit, alert = false }) => (
+const VitalDisplay: React.FC<VitalDisplayProps> = ({ label, value, unit, alert = false }: VitalDisplayProps) => (
   <div className={`
-    p-2 rounded-lg 
-    ${alert ? 'bg-red-900/30 border border-red-700/50' : 'bg-gray-900/50'}
+    p-2 rounded-lg text-center
+    ${alert ? 'bg-red-50 border border-red-200' : 'bg-gray-50'}
   `}>
-    <div className="text-xs text-gray-400 mb-0.5">{label}</div>
-    <div className={`text-lg font-semibold ${alert ? 'text-red-300' : 'text-white'}`}>
-      {value != null ? value.toFixed(1) : '--'}
-      {unit && <span className="text-xs text-gray-500 ml-1">{unit}</span>}
+    <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+    <div className={`text-sm font-semibold ${alert ? 'text-red-600' : 'text-gray-900'}`}>
+      {value != null ? value.toFixed(0) : '--'}
+      <span className="text-xs text-gray-400 ml-0.5">{unit}</span>
     </div>
   </div>
 )
-
-// Signal quality bar
-const SignalQualityBar: React.FC<{ quality: number }> = ({ quality }) => {
-  const percentage = Math.min(100, Math.max(0, quality * 100))
-  const color = percentage >= 70 ? 'bg-green-500' : percentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
-  
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-        <div 
-          className={`h-full ${color} transition-all duration-300`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-      <span className="text-gray-400 w-8">{percentage.toFixed(0)}%</span>
-    </div>
-  )
-}
 
 // Timestamp formatter
 const formatTimestamp = (timestamp: number): string => {
   try {
     const date = new Date(timestamp)
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit' 
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
     })
   } catch {
     return '--:--:--'

@@ -30,12 +30,12 @@ const ChartControls: React.FC<ChartControlsProps> = memo(({
   }, [onTimeRangeChange])
 
   return (
-    <div className={`flex items-center gap-4 p-2 bg-gray-800 rounded-lg ${className}`}>
+    <div className={`flex items-center gap-4 p-2 bg-gray-50 rounded-lg border border-gray-200 ${className}`}>
       {/* Zoom Controls */}
       <div className="flex items-center gap-1">
         <button
           onClick={onZoomIn}
-          className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 transition-colors"
+          className="p-1.5 bg-white hover:bg-gray-100 border border-gray-200 rounded text-gray-600 transition-colors"
           title="Zoom In"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -43,10 +43,10 @@ const ChartControls: React.FC<ChartControlsProps> = memo(({
             <path d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
           </svg>
         </button>
-        
+
         <button
           onClick={onZoomOut}
-          className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 transition-colors"
+          className="p-1.5 bg-white hover:bg-gray-100 border border-gray-200 rounded text-gray-600 transition-colors"
           title="Zoom Out"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -57,7 +57,7 @@ const ChartControls: React.FC<ChartControlsProps> = memo(({
 
         <button
           onClick={onReset}
-          className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 transition-colors"
+          className="p-1.5 bg-white hover:bg-gray-100 border border-gray-200 rounded text-gray-600 transition-colors"
           title="Reset View"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -68,19 +68,19 @@ const ChartControls: React.FC<ChartControlsProps> = memo(({
       </div>
 
       {/* Divider */}
-      <div className="w-px h-6 bg-gray-600" />
+      <div className="w-px h-6 bg-gray-300" />
 
       {/* Time Range Selector */}
       <div className="flex items-center gap-1">
-        <span className="text-xs text-gray-400 mr-2">Time Range:</span>
+        <span className="text-xs text-gray-500 mr-2">Time Range:</span>
         {TIME_RANGES.map(({ label, minutes }) => (
           <button
             key={label}
             onClick={() => handleRangeChange(minutes)}
             className={`px-2 py-1 text-xs rounded transition-colors ${
               activeRange === minutes
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                ? 'bg-blue-500 text-white'
+                : 'bg-white hover:bg-gray-100 border border-gray-200 text-gray-600'
             }`}
           >
             {label}

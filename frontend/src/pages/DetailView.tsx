@@ -13,9 +13,17 @@ export const DetailView: React.FC = () => {
     patientId ? state.patients.get(patientId) : undefined
   )
   
+  // Get live update for MHR alert
+  const liveUpdate = usePatientStore(state =>
+    patientId ? state.liveUpdates.get(patientId) : undefined
+  )
+  
   const [detail, setDetail] = useState<PatientSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Check for MHR detection
+  const isMHR = liveUpdate?.mhr_alert?.is_mhr ?? false
   
   // Fetch full patient detail
   useEffect(() => {
@@ -56,25 +64,43 @@ export const DetailView: React.FC = () => {
       <div className="mb-6">
         <button
           onClick={() => navigate('/')}
-          className="text-gray-400 hover:text-white text-sm mb-4 flex items-center gap-1"
+          className="text-gray-500 hover:text-gray-900 text-sm mb-4 flex items-center gap-1"
         >
           ← Back to Ward View
         </button>
         
+        {/* MHR Warning Banner */}
+        {isMHR && (
+          <div className="mb-4 bg-orange-100 border border-orange-300 text-orange-800 px-4 py-3 rounded-lg flex items-center gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="font-bold">MATERNAL PULSE DETECTED</p>
+              <p className="text-sm">
+                Signal may be maternal heart rate – verify sensor placement
+                {liveUpdate?.mhr_alert?.confidence && (
+                  <span className="ml-2 opacity-75">
+                    (Confidence: {Math.round(liveUpdate.mhr_alert.confidence * 100)}%)
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">
+            <h1 className="text-2xl font-bold text-gray-900">
               Patient: {patientId}
             </h1>
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-gray-500 text-sm mt-1">
               Real-time monitoring data
             </p>
           </div>
-          
+
           {currentData && (
-            <CategoryBadge 
-              category={currentData.category} 
-              size="lg" 
+            <CategoryBadge
+              category={currentData.category}
+              size="lg"
             />
           )}
         </div>
@@ -92,13 +118,21 @@ export const DetailView: React.FC = () => {
           <div className="space-y-6">
             <TrendPanel 
               data={currentData.trend_data ? {
-                deteriorationScore: currentData.trend_data.deterioration_score,
-                variabilityTrend: currentData.trend_data.variability_slope > 0 ? 'increasing' 
-                  : currentData.trend_data.variability_slope < 0 ? 'decreasing' 
+                deteriorationScore: liveUpdate?.trend_score ?? currentData.trend_data.deterioration_score,
+                variabilityTrend: (liveUpdate?.trend_slope ?? currentData.trend_data.variability_slope) > 0 ? 'increasing' 
+                  : (liveUpdate?.trend_slope ?? currentData.trend_data.variability_slope) < 0 ? 'decreasing' 
                   : 'stable',
                 decelsIn30min: currentData.trend_data.decel_count_30min,
                 lateDecelsIn15min: currentData.trend_data.late_decel_count_15min,
                 alerts: currentData.trend_data.alerts.map(a => a.message),
+              } : liveUpdate?.trend_score != null ? {
+                deteriorationScore: liveUpdate.trend_score,
+                variabilityTrend: liveUpdate.trend_slope && liveUpdate.trend_slope > 0 ? 'increasing'
+                  : liveUpdate.trend_slope && liveUpdate.trend_slope < 0 ? 'decreasing'
+                  : 'stable',
+                decelsIn30min: 0,
+                lateDecelsIn15min: 0,
+                alerts: [],
               } : undefined}
             />
             <ExplanationPanel 
@@ -124,64 +158,64 @@ export const DetailView: React.FC = () => {
 const VitalsPanel: React.FC<{ patient: PatientSnapshot }> = ({ patient }) => {
   const fhr = patient.metrics.current_fhr
   const isAbnormalFHR = fhr != null && (fhr < 110 || fhr > 160)
-  
+
   return (
-    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-      <h2 className="text-lg font-semibold text-white mb-4">Current Vitals</h2>
-      
+    <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+      <h2 className="text-lg font-semibold text-gray-900 mb-4">Current Vitals</h2>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <VitalCard 
-          label="FHR" 
-          value={patient.metrics.current_fhr} 
-          unit="bpm" 
+        <VitalCard
+          label="FHR"
+          value={patient.metrics.current_fhr}
+          unit="bpm"
           alert={isAbnormalFHR}
           normalRange="110-160"
         />
-        <VitalCard 
-          label="Baseline" 
-          value={patient.metrics.baseline_fhr} 
+        <VitalCard
+          label="Baseline"
+          value={patient.metrics.baseline_fhr}
           unit="bpm"
         />
-        <VitalCard 
-          label="Variability" 
-          value={patient.metrics.variability} 
+        <VitalCard
+          label="Variability"
+          value={patient.metrics.variability}
           unit=""
         />
-        <VitalCard 
-          label="Contractions" 
-          value={patient.metrics.current_uc} 
+        <VitalCard
+          label="Contractions"
+          value={patient.metrics.current_uc}
           unit=""
         />
       </div>
-      
+
       {/* Additional metrics */}
-      <div className="mt-4 pt-4 border-t border-gray-700 grid grid-cols-3 gap-4 text-sm">
+      <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-3 gap-4 text-sm">
         <div>
           <span className="text-gray-500">Signal Quality</span>
           <div className="mt-1 flex items-center gap-2">
-            <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
-              <div 
+            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
                 className="h-full bg-blue-500"
                 style={{ width: `${(patient.fsqi_score ?? 0) * 100}%` }}
               />
             </div>
-            <span className="text-white">
+            <span className="text-gray-900 font-medium">
               {((patient.fsqi_score ?? 0) * 100).toFixed(0)}%
             </span>
           </div>
         </div>
         <div>
           <span className="text-gray-500">Accelerations</span>
-          <div className="text-white mt-1">{patient.metrics.acceleration_count ?? 0}</div>
+          <div className="text-gray-900 font-medium mt-1">{patient.metrics.acceleration_count ?? 0}</div>
         </div>
         <div>
           <span className="text-gray-500">Decelerations</span>
-          <div className="text-white mt-1">{patient.metrics.deceleration_count ?? 0}</div>
+          <div className="text-gray-900 font-medium mt-1">{patient.metrics.deceleration_count ?? 0}</div>
         </div>
       </div>
-      
+
       {/* Timestamp */}
-      <div className="mt-4 text-xs text-gray-500 text-right">
+      <div className="mt-4 text-xs text-gray-400 text-right">
         Last updated: {new Date(patient.last_update).toLocaleTimeString()}
       </div>
     </div>
@@ -197,22 +231,22 @@ interface VitalCardProps {
   normalRange?: string
 }
 
-const VitalCard: React.FC<VitalCardProps> = ({ 
-  label, 
-  value, 
-  unit, 
+const VitalCard: React.FC<VitalCardProps> = ({
+  label,
+  value,
+  unit,
   alert = false,
-  normalRange 
+  normalRange
 }) => (
   <div className={`
-    p-4 rounded-lg 
-    ${alert ? 'bg-red-900/40 border border-red-700' : 'bg-gray-900/50'}
+    p-4 rounded-lg
+    ${alert ? 'bg-red-50 border border-red-300' : 'bg-gray-50'}
   `}>
-    <div className="text-sm text-gray-400">{label}</div>
-    <div className={`text-3xl font-bold ${alert ? 'text-red-300' : 'text-white'}`}>
+    <div className="text-sm text-gray-500">{label}</div>
+    <div className={`text-3xl font-bold ${alert ? 'text-red-600' : 'text-gray-900'}`}>
       {value != null ? value.toFixed(1) : '--'}
     </div>
-    <div className="text-xs text-gray-500">
+    <div className="text-xs text-gray-400">
       {unit}
       {normalRange && <span className="ml-1">({normalRange})</span>}
     </div>
@@ -236,10 +270,10 @@ const CTGChartPanel: React.FC = () => {
   }, [])
   
   return (
-    <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-      <div className="p-4 border-b border-gray-700">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">CTG Monitor</h2>
+          <h2 className="text-lg font-semibold text-gray-900">CTG Monitor</h2>
           <ChartControls
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
@@ -250,8 +284,8 @@ const CTGChartPanel: React.FC = () => {
           />
         </div>
       </div>
-      <CTGChart 
-        height={350} 
+      <CTGChart
+        height={350}
         showControls={true}
         isLive={true}
       />
@@ -262,32 +296,32 @@ const CTGChartPanel: React.FC = () => {
 // Events Panel
 const EventsPanel: React.FC<{ alerts: Alert[] }> = ({ alerts }) => {
   const recentAlerts = alerts.slice(-10).reverse()
-  
+
   return (
-    <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-      <h3 className="text-md font-semibold text-white mb-3">Recent Events</h3>
-      
+    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+      <h3 className="text-md font-semibold text-gray-900 mb-3">Recent Events</h3>
+
       {recentAlerts.length > 0 ? (
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {recentAlerts.map((alert, idx) => (
-            <div 
+            <div
               key={idx}
-              className="p-2 rounded bg-gray-900/50 text-sm"
+              className="p-2 rounded bg-gray-50 text-sm"
             >
               <div className="flex items-center justify-between">
-                <span className="text-white font-medium">{alert.type}</span>
-                <span className="text-xs text-gray-500">
+                <span className="text-gray-900 font-medium">{alert.type}</span>
+                <span className="text-xs text-gray-400">
                   {new Date(alert.timestamp).toLocaleTimeString()}
                 </span>
               </div>
-              <div className="text-xs text-gray-400 mt-1">
+              <div className="text-xs text-gray-500 mt-1">
                 {alert.message}
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-500">No events recorded</p>
+        <p className="text-sm text-gray-400">No events recorded</p>
       )}
     </div>
   )
@@ -296,36 +330,36 @@ const EventsPanel: React.FC<{ alerts: Alert[] }> = ({ alerts }) => {
 // Alerts Panel
 const AlertsPanel: React.FC<{ patient: PatientSnapshot }> = ({ patient }) => {
   const alertMessages: string[] = []
-  
+
   const fhr = patient.metrics.current_fhr
   if (fhr != null && fhr < 110) alertMessages.push('Bradycardia: FHR below 110 bpm')
   if (fhr != null && fhr > 160) alertMessages.push('Tachycardia: FHR above 160 bpm')
   if (patient.metrics.variability != null && patient.metrics.variability < 5) alertMessages.push('Reduced variability')
   if ((patient.fsqi_score ?? 0) < 0.5) alertMessages.push('Poor signal quality')
   if (patient.category === 3) alertMessages.push('Pathological CTG pattern')
-  
+
   return (
     <div className={`
-      rounded-xl p-4 border
-      ${alertMessages.length > 0 
-        ? 'bg-red-900/20 border-red-700/50' 
-        : 'bg-gray-800 border-gray-700'}
+      rounded-xl p-4 border shadow-sm
+      ${alertMessages.length > 0
+        ? 'bg-red-50 border-red-200'
+        : 'bg-white border-gray-200'}
     `}>
-      <h3 className="text-md font-semibold text-white mb-3">
+      <h3 className="text-md font-semibold text-gray-900 mb-3">
         Alerts {alertMessages.length > 0 && `(${alertMessages.length})`}
       </h3>
-      
+
       {alertMessages.length > 0 ? (
         <ul className="space-y-2">
           {alertMessages.map((alertMsg, idx) => (
             <li key={idx} className="flex items-start gap-2 text-sm">
-              <span className="text-red-400">⚠️</span>
-              <span className="text-red-200">{alertMsg}</span>
+              <span className="text-red-500">⚠️</span>
+              <span className="text-red-700">{alertMsg}</span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-green-400">✓ No active alerts</p>
+        <p className="text-sm text-green-600">✓ No active alerts</p>
       )}
     </div>
   )
@@ -345,10 +379,10 @@ const LoadingState: React.FC = () => (
 const ErrorState: React.FC<{ error: string; onRetry: () => void }> = ({ error, onRetry }) => (
   <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-500">
     <div className="text-4xl mb-4">❌</div>
-    <p className="text-red-400 mb-4">{error}</p>
+    <p className="text-red-600 mb-4">{error}</p>
     <button
       onClick={onRetry}
-      className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg"
+      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg border border-gray-300"
     >
       Retry
     </button>
@@ -362,7 +396,7 @@ const NotFoundState: React.FC<{ onBack: () => void }> = ({ onBack }) => (
     <p className="mb-4">Patient not found</p>
     <button
       onClick={onBack}
-      className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg"
+      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg border border-gray-300"
     >
       Back to Ward
     </button>

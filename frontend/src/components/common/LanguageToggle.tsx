@@ -25,8 +25,8 @@ export const LanguageToggle: React.FC<LanguageToggleProps> = ({
       onClick={toggleLanguage}
       className={`
         flex items-center gap-2 px-3 py-1.5 rounded-lg
-        bg-gray-700 hover:bg-gray-600
-        text-sm font-medium text-gray-200
+        bg-gray-100 hover:bg-gray-200 border border-gray-200
+        text-sm font-medium text-gray-700
         transition-colors duration-200
         ${className}
       `}
@@ -35,7 +35,7 @@ export const LanguageToggle: React.FC<LanguageToggleProps> = ({
       <span className={`transition-opacity ${currentLang === 'en' ? 'opacity-100' : 'opacity-50'}`}>
         EN
       </span>
-      <span className="text-gray-500">/</span>
+      <span className="text-gray-400">/</span>
       <span className={`transition-opacity ${currentLang === 'he' ? 'opacity-100' : 'opacity-50'}`}>
         עב
       </span>

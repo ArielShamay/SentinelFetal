@@ -4,7 +4,7 @@
 
 import { useRef, useEffect, useCallback } from 'react'
 import { createChart, IChartApi, ISeriesApi, LineData, Time } from 'lightweight-charts'
-import { DEFAULT_CHART_OPTIONS, FHR_SERIES_OPTIONS, UC_SERIES_OPTIONS } from '../utils/chartConfig'
+import { DEFAULT_CHART_OPTIONS, LIGHT_CHART_OPTIONS, FHR_SERIES_OPTIONS, UC_SERIES_OPTIONS } from '../utils/chartConfig'
 import type { ChartDataPoint } from '../types/chart'
 
 interface UseLightweightChartOptions {
@@ -22,6 +22,10 @@ interface ChartReturn {
   setTimeRange: (start: Time, end: Time) => void
   fitContent: () => void
   scrollToRealTime: () => void
+  zoomIn: () => void
+  zoomOut: () => void
+  panLeft: () => void
+  panRight: () => void
 }
 
 /**
@@ -45,9 +49,12 @@ export function useLightweightChart(options: UseLightweightChartOptions): ChartR
   useEffect(() => {
     if (!container) return
 
+    // Select chart options based on theme
+    const chartOptions = darkMode ? DEFAULT_CHART_OPTIONS : LIGHT_CHART_OPTIONS
+
     // Create chart instance
     const chart = createChart(container, {
-      ...DEFAULT_CHART_OPTIONS,
+      ...chartOptions,
       width: container.clientWidth,
       height: container.clientHeight,
     })
@@ -68,14 +75,16 @@ export function useLightweightChart(options: UseLightweightChartOptions): ChartR
     })
     ucSeriesRef.current = ucSeries
 
-    // Configure price scales
+    // Configure price scales with theme-appropriate colors
+    const borderColor = darkMode ? '#3d3d3d' : '#e5e7eb'
+
     chart.priceScale('fhr').applyOptions({
       scaleMargins: {
         top: 0.05,
         bottom: 0.55,
       },
       borderVisible: true,
-      borderColor: '#3d3d3d',
+      borderColor,
     })
 
     chart.priceScale('uc').applyOptions({
@@ -84,7 +93,7 @@ export function useLightweightChart(options: UseLightweightChartOptions): ChartR
         bottom: 0.05,
       },
       borderVisible: true,
-      borderColor: '#3d3d3d',
+      borderColor,
     })
 
     // Handle resize
@@ -152,6 +161,76 @@ export function useLightweightChart(options: UseLightweightChartOptions): ChartR
     chartRef.current.timeScale().scrollToRealTime()
   }, [])
 
+  /**
+   * Zoom in - reduce visible time range by 20%
+   */
+  const zoomIn = useCallback(() => {
+    if (!chartRef.current) return
+    const timeScale = chartRef.current.timeScale()
+    const visibleRange = timeScale.getVisibleLogicalRange()
+    if (!visibleRange) return
+
+    const { from, to } = visibleRange
+    const range = to - from
+    const newRange = range * 0.8 // Zoom in by 20%
+    const center = (from + to) / 2
+    const newFrom = center - newRange / 2
+    const newTo = center + newRange / 2
+
+    timeScale.setVisibleLogicalRange({ from: newFrom, to: newTo })
+  }, [])
+
+  /**
+   * Zoom out - increase visible time range by 25%
+   */
+  const zoomOut = useCallback(() => {
+    if (!chartRef.current) return
+    const timeScale = chartRef.current.timeScale()
+    const visibleRange = timeScale.getVisibleLogicalRange()
+    if (!visibleRange) return
+
+    const { from, to } = visibleRange
+    const range = to - from
+    const newRange = range * 1.25 // Zoom out by 25%
+    const center = (from + to) / 2
+    const newFrom = center - newRange / 2
+    const newTo = center + newRange / 2
+
+    timeScale.setVisibleLogicalRange({ from: newFrom, to: newTo })
+  }, [])
+
+  /**
+   * Pan left - scroll back in time
+   */
+  const panLeft = useCallback(() => {
+    if (!chartRef.current) return
+    const timeScale = chartRef.current.timeScale()
+    const visibleRange = timeScale.getVisibleLogicalRange()
+    if (!visibleRange) return
+
+    const { from, to } = visibleRange
+    const range = to - from
+    const shift = range * 0.2 // Pan by 20% of visible range
+
+    timeScale.setVisibleLogicalRange({ from: from - shift, to: to - shift })
+  }, [])
+
+  /**
+   * Pan right - scroll forward in time
+   */
+  const panRight = useCallback(() => {
+    if (!chartRef.current) return
+    const timeScale = chartRef.current.timeScale()
+    const visibleRange = timeScale.getVisibleLogicalRange()
+    if (!visibleRange) return
+
+    const { from, to } = visibleRange
+    const range = to - from
+    const shift = range * 0.2 // Pan by 20% of visible range
+
+    timeScale.setVisibleLogicalRange({ from: from + shift, to: to + shift })
+  }, [])
+
   return {
     chart: chartRef.current,
     fhrSeries: fhrSeriesRef.current,
@@ -161,5 +240,9 @@ export function useLightweightChart(options: UseLightweightChartOptions): ChartR
     setTimeRange,
     fitContent,
     scrollToRealTime,
+    zoomIn,
+    zoomOut,
+    panLeft,
+    panRight,
   }
 }

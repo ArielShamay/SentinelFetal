@@ -139,6 +139,25 @@ class OrchestratorAdapter:
             if hasattr(uc_data, 'tolist'):
                 uc_data = uc_data.tolist()
             
+            # Extract MHR alert if present
+            mhr_alert = result.get('mhr_alert')
+            if mhr_alert:
+                mhr_alert = {
+                    'is_mhr': mhr_alert.get('is_mhr', False),
+                    'confidence': mhr_alert.get('confidence', 0.0),
+                    'recommended_action': mhr_alert.get('recommended_action', 'NONE'),
+                    'detection_methods': mhr_alert.get('detection_methods', []),
+                    'message': mhr_alert.get('message'),
+                }
+            
+            # Extract trend data if present
+            trend_data = result.get('trend')
+            trend_score = None
+            trend_slope = None
+            if trend_data:
+                trend_score = trend_data.get('deterioration_score', 0)
+                trend_slope = trend_data.get('variability_slope', 0)
+            
             update = {
                 "type": "patient_update",
                 "timestamp": time.time(),
@@ -151,6 +170,10 @@ class OrchestratorAdapter:
                 "fsqi": result.get('fsqi', 1.0),
                 "confidence": result.get('confidence', 0.0),
                 "findings": result.get('findings', {}),
+                # V2.0 fields
+                "mhr_alert": mhr_alert,
+                "trend_score": trend_score,
+                "trend_slope": trend_slope,
             }
             
             push_to_websocket(update)

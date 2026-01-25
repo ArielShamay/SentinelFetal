@@ -25,32 +25,32 @@ export const ExplanationPanel: React.FC<ExplanationPanelProps> = ({
 
   if (!data) {
     return (
-      <div className={`bg-gray-800 rounded-xl p-4 border border-gray-700 ${className}`}>
-        <h3 className="text-md font-semibold text-white mb-3 flex items-center gap-2">
+      <div className={`bg-white rounded-xl p-4 border border-gray-200 shadow-sm ${className}`}>
+        <h3 className="text-md font-semibold text-gray-900 mb-3 flex items-center gap-2">
           <span>🔍</span>
           {t('explanation.title')}
         </h3>
-        <p className="text-sm text-gray-500">{t('explanation.noExplanation')}</p>
+        <p className="text-sm text-gray-400">{t('explanation.noExplanation')}</p>
       </div>
     )
   }
 
   // Category colors
   const categoryColors = {
-    1: 'text-green-400 bg-green-900/20',
-    2: 'text-orange-400 bg-orange-900/20',
-    3: 'text-red-400 bg-red-900/20',
+    1: 'text-green-700 bg-green-50 border border-green-200',
+    2: 'text-orange-700 bg-orange-50 border border-orange-200',
+    3: 'text-red-700 bg-red-50 border border-red-200',
   }
 
   // Confidence color
-  const confidenceColor = 
-    data.confidence >= 80 ? 'text-green-400' :
-    data.confidence >= 60 ? 'text-yellow-400' :
-    'text-red-400'
+  const confidenceColor =
+    data.confidence >= 80 ? 'text-green-600' :
+    data.confidence >= 60 ? 'text-yellow-600' :
+    'text-red-600'
 
   return (
-    <div className={`bg-gray-800 rounded-xl p-4 border border-gray-700 ${className}`}>
-      <h3 className="text-md font-semibold text-white mb-4 flex items-center gap-2">
+    <div className={`bg-white rounded-xl p-4 border border-gray-200 shadow-sm ${className}`}>
+      <h3 className="text-md font-semibold text-gray-900 mb-4 flex items-center gap-2">
         <span>🔍</span>
         {t('explanation.title')}
       </h3>
@@ -68,16 +68,16 @@ export const ExplanationPanel: React.FC<ExplanationPanelProps> = ({
       {/* Contributing Factors */}
       {data.factors.length > 0 && (
         <div className="mb-4">
-          <div className="text-sm text-gray-400 mb-2">
+          <div className="text-sm text-gray-500 mb-2">
             {t('explanation.factors')}:
           </div>
           <ul className="space-y-1.5">
             {data.factors.map((factor, idx) => (
-              <li 
+              <li
                 key={idx}
-                className="flex items-start gap-2 text-sm text-gray-300"
+                className="flex items-start gap-2 text-sm text-gray-600"
               >
-                <span className="text-gray-500 mt-0.5">•</span>
+                <span className="text-gray-400 mt-0.5">•</span>
                 <span>{factor}</span>
               </li>
             ))}
@@ -86,8 +86,8 @@ export const ExplanationPanel: React.FC<ExplanationPanelProps> = ({
       )}
 
       {/* Confidence */}
-      <div className="flex items-center justify-between pt-3 border-t border-gray-700">
-        <span className="text-sm text-gray-400">{t('explanation.confidence')}</span>
+      <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+        <span className="text-sm text-gray-500">{t('explanation.confidence')}</span>
         <span className={`font-mono font-semibold ${confidenceColor}`}>
           {data.confidence}%
         </span>

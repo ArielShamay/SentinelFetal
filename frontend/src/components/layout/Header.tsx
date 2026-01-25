@@ -14,34 +14,34 @@ export function Header({ onToggleSidebar, showSidebarToggle, sidebarOpen }: Head
   const { t } = useTranslation()
   
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
-          <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
+          <span className="text-xl font-bold text-blue-600">
             {t('app.title')}
           </span>
-          <span className="text-sm text-gray-500 dark:text-gray-400">{t('app.version')}</span>
+          <span className="text-sm text-gray-500">{t('app.version')}</span>
         </Link>
 
         {/* Controls */}
         <div className="flex items-center gap-4">
           <SimulationControls />
-          <div className="h-6 w-px bg-gray-600" />
+          <div className="h-6 w-px bg-gray-300" />
           <LanguageToggle />
           <ConnectionStatus />
-          
+
           {/* God Mode Toggle */}
           {showSidebarToggle && onToggleSidebar && (
             <>
-              <div className="h-6 w-px bg-gray-600" />
+              <div className="h-6 w-px bg-gray-300" />
               <button
                 onClick={onToggleSidebar}
                 className={`
                   px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
-                  ${sidebarOpen 
-                    ? 'bg-purple-600 text-white' 
-                    : 'bg-purple-900/30 text-purple-400 hover:bg-purple-900/50'}
+                  ${sidebarOpen
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}
                 `}
                 title="Toggle God Mode Panel"
               >

@@ -35,10 +35,14 @@ const CTGChart: React.FC<CTGChartProps> = memo(({
     updateUCData,
     fitContent,
     scrollToRealTime,
+    zoomIn,
+    zoomOut,
+    panLeft,
+    panRight,
   } = useLightweightChart({
     container,
     autoSize: true,
-    darkMode: true,
+    darkMode: false,
   })
 
   // Initialize data buffers
@@ -88,32 +92,65 @@ const CTGChart: React.FC<CTGChartProps> = memo(({
   }, [isFollowingRealTime, scrollToRealTime])
 
   return (
-    <div className="ctg-chart-container relative bg-gray-900 rounded-lg overflow-hidden">
+    <div className="ctg-chart-container relative bg-white rounded-lg overflow-hidden border border-gray-200">
       {/* Chart Header */}
-      <div className="chart-header flex justify-between items-center p-2 bg-gray-800 border-b border-gray-700">
+      <div className="chart-header flex justify-between items-center p-2 bg-gray-50 border-b border-gray-200">
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-300">
-            FHR: <span className="text-green-400 font-mono">{CLINICAL_RANGES.fhr.min}-{CLINICAL_RANGES.fhr.max} bpm</span>
+          <span className="text-sm text-gray-600">
+            FHR: <span className="text-blue-600 font-mono">{CLINICAL_RANGES.fhr.min}-{CLINICAL_RANGES.fhr.max} bpm</span>
           </span>
-          <span className="text-sm text-gray-300">
-            UC: <span className="text-purple-400 font-mono">{CLINICAL_RANGES.uc.min}-{CLINICAL_RANGES.uc.max} mmHg</span>
+          <span className="text-sm text-gray-600">
+            UC: <span className="text-orange-600 font-mono">{CLINICAL_RANGES.uc.min}-{CLINICAL_RANGES.uc.max} mmHg</span>
           </span>
         </div>
-        
+
         {showControls && (
           <div className="flex items-center gap-2">
+            {/* Pan Left */}
+            <button
+              onClick={panLeft}
+              className="p-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700 transition-colors"
+              title="Pan Left"
+            >
+              ◀
+            </button>
+            {/* Zoom Out */}
+            <button
+              onClick={zoomOut}
+              className="p-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700 transition-colors"
+              title="Zoom Out"
+            >
+              −
+            </button>
+            {/* Zoom In */}
+            <button
+              onClick={zoomIn}
+              className="p-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700 transition-colors"
+              title="Zoom In"
+            >
+              +
+            </button>
+            {/* Pan Right */}
+            <button
+              onClick={panRight}
+              className="p-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700 transition-colors"
+              title="Pan Right"
+            >
+              ▶
+            </button>
+            <div className="w-px h-4 bg-gray-300 mx-1" />
             <button
               onClick={fitContent}
-              className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded text-gray-300 transition-colors"
+              className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700 transition-colors"
             >
-              Fit
+              Fit All
             </button>
             <button
               onClick={handleLiveToggle}
               className={`px-2 py-1 text-xs rounded transition-colors ${
                 isFollowingRealTime
-                  ? 'bg-green-600 hover:bg-green-500 text-white'
-                  : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                  ? 'bg-green-500 hover:bg-green-600 text-white'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
               }`}
             >
               LIVE
@@ -125,7 +162,7 @@ const CTGChart: React.FC<CTGChartProps> = memo(({
       {/* Clinical Ranges Indicator */}
       <div className="absolute left-0 top-12 bottom-0 w-1 z-10">
         {/* Normal FHR zone */}
-        <div 
+        <div
           className="absolute w-full"
           style={{
             top: '5%',
@@ -157,7 +194,7 @@ const CTGChart: React.FC<CTGChartProps> = memo(({
       {isLive && isFollowingRealTime && (
         <div className="absolute top-14 right-4 flex items-center gap-1">
           <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-          <span className="text-xs text-red-400">LIVE</span>
+          <span className="text-xs text-red-500 font-medium">LIVE</span>
         </div>
       )}
     </div>

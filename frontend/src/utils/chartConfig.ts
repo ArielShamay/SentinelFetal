@@ -61,6 +61,62 @@ export const DEFAULT_CHART_OPTIONS: DeepPartial<ChartOptions> = {
   },
 }
 
+// Light theme chart options
+export const LIGHT_CHART_OPTIONS: DeepPartial<ChartOptions> = {
+  layout: {
+    background: { type: ColorType.Solid, color: '#ffffff' },
+    textColor: '#374151', // gray-700
+    fontSize: 11,
+    fontFamily: "'Inter', system-ui, sans-serif",
+  },
+  grid: {
+    vertLines: { color: '#e5e7eb', style: LineStyle.Solid, visible: true }, // gray-200
+    horzLines: { color: '#e5e7eb', style: LineStyle.Solid, visible: true },
+  },
+  crosshair: {
+    mode: CrosshairMode.Normal,
+    vertLine: {
+      color: '#9ca3af',
+      width: 1,
+      style: LineStyle.Dashed,
+      labelBackgroundColor: '#f3f4f6',
+      visible: true,
+      labelVisible: true,
+    },
+    horzLine: {
+      color: '#9ca3af',
+      width: 1,
+      style: LineStyle.Dashed,
+      labelBackgroundColor: '#f3f4f6',
+      visible: true,
+      labelVisible: true,
+    },
+  },
+  timeScale: {
+    timeVisible: true,
+    secondsVisible: true,
+    borderColor: '#e5e7eb',
+    rightOffset: 5,
+    barSpacing: 6,
+  },
+  rightPriceScale: {
+    borderColor: '#e5e7eb',
+    scaleMargins: { top: 0.05, bottom: 0.05 },
+  },
+  handleScroll: {
+    mouseWheel: true,
+    pressedMouseMove: true,
+    horzTouchDrag: true,
+    vertTouchDrag: false,
+  },
+  handleScale: {
+    axisPressedMouseMove: true,
+    mouseWheel: true,
+    pinch: true,
+    axisDoubleClickReset: true,
+  },
+}
+
 // FHR series options (blue line)
 export const FHR_SERIES_OPTIONS: DeepPartial<LineSeriesOptions> = {
   color: '#3b82f6', // blue-500

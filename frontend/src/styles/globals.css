@@ -3,11 +3,24 @@
 @tailwind utilities;
 
 :root {
+  /* Clinical category colors - ALWAYS visible */
   --cat-normal: #28a745;
   --cat-intermediate: #fd7e14;
   --cat-pathological: #dc3545;
+
+  /* Chart colors */
   --fhr-blue: #1E90FF;
   --uc-orange: #FF8C00;
+
+  /* Light theme base */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-card: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --text-muted: #6c757d;
+  --border-color: #dee2e6;
+  --border-light: #e9ecef;
 }
 
 body {
@@ -17,9 +30,48 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 /* RTL support */
 [dir="rtl"] {
   text-align: right;
+}
+
+/* Override dark mode - force light theme */
+.dark {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+}
+
+/* Medical Monitor Card Styling */
+.monitor-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.monitor-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Category-specific border highlights */
+.monitor-card.cat-1 {
+  border-left: 4px solid var(--cat-normal);
+}
+
+.monitor-card.cat-2 {
+  border-left: 4px solid var(--cat-intermediate);
+}
+
+.monitor-card.cat-3 {
+  border-left: 4px solid var(--cat-pathological);
+  animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(220, 53, 69, 0); }
 }
