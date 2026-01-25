@@ -62,6 +62,28 @@ export const usePatientStore = create<PatientState>()(
           
           const newUpdates = new Map(state.liveUpdates)
           newUpdates.set(update.patient_id, update)
+
+          const newPatients = new Map(state.patients)
+          const existingPatient = newPatients.get(update.patient_id)
+          if (existingPatient) {
+            const latestFhr = update.fhr_latest?.[update.fhr_latest.length - 1]
+            const latestUc = update.uc_latest?.[update.uc_latest.length - 1]
+            newPatients.set(update.patient_id, {
+              ...existingPatient,
+              category: update.category,
+              category_name: update.category === 1 ? 'Normal' : update.category === 2 ? 'Suspicious' : 'Pathological',
+              metrics: {
+                ...existingPatient.metrics,
+                baseline_fhr: update.baseline,
+                current_fhr: latestFhr ?? existingPatient.metrics.current_fhr,
+                variability: update.variability,
+                current_uc: latestUc ?? existingPatient.metrics.current_uc,
+              },
+              explanation: update.explanation ?? existingPatient.explanation,
+              highlight_regions: update.highlight_regions ?? existingPatient.highlight_regions,
+              last_update: Date.now(),
+            })
+          }
           
           // Also update summary if exists
           const newSummaries = new Map(state.patientSummaries)
@@ -80,6 +102,7 @@ export const usePatientStore = create<PatientState>()(
           return { 
             liveUpdates: newUpdates, 
             patientSummaries: newSummaries,
+            patients: newPatients,
             lastUpdate: Date.now() 
           }
         }),

@@ -80,6 +80,10 @@ class PatientSnapshot(BaseModel):
     alerts: List[AlertInfo] = Field(default_factory=list)
     trend_data: Optional[Dict[str, Any]] = Field(None, description="Trend analysis data")
     explanation: Optional[Dict[str, Any]] = Field(None, description="AI explanation")
+    highlight_regions: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Highlighted regions for chart annotations",
+    )
     fsqi_score: float = Field(default=1.0, ge=0.0, le=1.0, description="Signal quality")
     has_active_event: bool = Field(default=False, description="Has injected event active")
     last_update: float = Field(..., description="Unix timestamp of last update")

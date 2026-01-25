@@ -44,8 +44,14 @@ export const DEFAULT_CHART_OPTIONS: DeepPartial<ChartOptions> = {
     barSpacing: 6,
   },
   rightPriceScale: {
+    visible: true,
     borderColor: '#374151',
     scaleMargins: { top: 0.05, bottom: 0.05 },
+  },
+  leftPriceScale: {
+    visible: true,
+    borderColor: '#374151',
+    scaleMargins: { top: 0.55, bottom: 0.05 },
   },
   handleScroll: {
     mouseWheel: true,
@@ -100,8 +106,14 @@ export const LIGHT_CHART_OPTIONS: DeepPartial<ChartOptions> = {
     barSpacing: 6,
   },
   rightPriceScale: {
+    visible: true,
     borderColor: '#e5e7eb',
     scaleMargins: { top: 0.05, bottom: 0.05 },
+  },
+  leftPriceScale: {
+    visible: true,
+    borderColor: '#e5e7eb',
+    scaleMargins: { top: 0.55, bottom: 0.05 },
   },
   handleScroll: {
     mouseWheel: true,
@@ -146,7 +158,7 @@ export const CLINICAL_RANGES = {
 export const CHART_CONSTANTS = {
   SAMPLING_RATE_HZ: 4,
   DEFAULT_WINDOW_MINUTES: 20,
-  BUFFER_SIZE: 4800,            // 20 min * 60 sec * 4 Hz
+  BUFFER_SIZE: 20000,           // ~83 min @ 4 Hz to cover long simulations
   SPARKLINE_POINTS: 60,         // 15 seconds at 4Hz
   UPDATE_THROTTLE_MS: 100,
   SPARKLINE_UPDATE_MS: 500,

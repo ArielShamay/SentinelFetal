@@ -114,13 +114,14 @@ export function generateSparklinePath(
   data: number[],
   width: number,
   height: number,
-  padding: number = 2
+  padding: number = 2,
+  range?: { min: number; max: number }
 ): string {
   if (data.length < 2) return ''
 
-  const minVal = Math.min(...data)
-  const maxVal = Math.max(...data)
-  const range = maxVal - minVal || 1
+  const minVal = range ? range.min : Math.min(...data)
+  const maxVal = range ? range.max : Math.max(...data)
+  const valueRange = maxVal - minVal || 1
 
   const innerWidth = width - padding * 2
   const innerHeight = height - padding * 2
@@ -129,7 +130,7 @@ export function generateSparklinePath(
 
   const points = data.map((value, i) => {
     const x = padding + i * xStep
-    const y = padding + innerHeight - ((value - minVal) / range) * innerHeight
+    const y = padding + innerHeight - ((value - minVal) / valueRange) * innerHeight
     return `${x},${y}`
   })
 

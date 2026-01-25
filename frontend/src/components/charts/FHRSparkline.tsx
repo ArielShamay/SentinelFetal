@@ -9,6 +9,9 @@ import { generateSparklinePath, isNormalFHR } from '../../utils/chartHelpers'
 import { CATEGORY_SPARKLINE_COLORS } from '../../utils/chartConfig'
 import type { SparklineProps } from '../../types/chart'
 
+const FHR_MIN = 50
+const FHR_MAX = 210
+
 /**
  * Mini sparkline for patient cards
  */
@@ -21,13 +24,15 @@ const FHRSparkline: React.FC<SparklineProps> = memo(({
   className = '',
 }) => {
   // Calculate path and stats
-  const { path, minValue, maxValue, trend } = useMemo(() => {
+  const { path, minValue, maxValue, trend, latestValue } = useMemo(() => {
     if (!data || data.length < 2) {
-      return { path: '', minValue: 0, maxValue: 0, trend: 'stable' as const }
+      return { path: '', minValue: FHR_MIN, maxValue: FHR_MAX, trend: 'stable' as const, latestValue: FHR_MIN }
     }
 
+    const clampedData = data.map(value => Math.min(FHR_MAX, Math.max(FHR_MIN, value)))
+
     // Generate SVG path
-    const pathString = generateSparklinePath(data, width, height, 2)
+    const pathString = generateSparklinePath(clampedData, width, height, 2, { min: FHR_MIN, max: FHR_MAX })
     
     // Calculate trend
     const recentData = data.slice(-10)
@@ -44,9 +49,10 @@ const FHRSparkline: React.FC<SparklineProps> = memo(({
     
     return {
       path: pathString,
-      minValue: Math.min(...data),
-      maxValue: Math.max(...data),
+      minValue: FHR_MIN,
+      maxValue: FHR_MAX,
       trend: trendValue,
+      latestValue: clampedData[clampedData.length - 1],
     }
   }, [data, width, height])
 
@@ -110,7 +116,7 @@ const FHRSparkline: React.FC<SparklineProps> = memo(({
         {/* End point */}
         <circle
           cx={width - 2}
-          cy={height - 2 - ((data[data.length - 1] - minValue) / (maxValue - minValue || 1)) * (height - 4)}
+          cy={height - 2 - ((latestValue - minValue) / (maxValue - minValue || 1)) * (height - 4)}
           r="2"
           fill={lineColor}
         />

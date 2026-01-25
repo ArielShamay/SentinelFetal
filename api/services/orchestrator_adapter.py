@@ -19,7 +19,19 @@ if str(ROOT) not in sys.path:
 
 from src.simulation.core.orchestrator import SimulationOrchestrator, OrchestratorConfig
 from src.simulation.processing.pipeline_adapter import PipelineAdapter, PipelineAdapterConfig
-from src.simulation.events.event_types import EventType, EventParameters
+from src.simulation.events.event_types import (
+    EventType,
+    EventParameters,
+    EventSeverity,
+    LateDecelerationParams,
+    VariableDecelerationParams,
+    ProlongedDecelerationParams,
+    BradycardiaParams,
+    TachycardiaParams,
+    VariabilityParams,
+    SinusoidalParams,
+    TachysystoleParams,
+)
 
 # Import DataBridge for snapshots
 try:
@@ -30,6 +42,102 @@ except ImportError:
     PatientSnapshot = None
 
 logger = logging.getLogger(__name__)
+
+EVENT_TYPE_API_TO_CORE = {
+    "LATE_DECEL": EventType.LATE_DECELERATION,
+    "VARIABLE_DECEL": EventType.VARIABLE_DECELERATION,
+    "PROLONGED_DECEL": EventType.PROLONGED_DECELERATION,
+    "BRADYCARDIA": EventType.BRADYCARDIA,
+    "TACHYCARDIA": EventType.TACHYCARDIA,
+    "MINIMAL_VARIABILITY": EventType.MINIMAL_VARIABILITY,
+    "SINUSOIDAL": EventType.SINUSOIDAL_PATTERN,
+    "HYPERSTIM": EventType.TACHYSYSTOLE,
+    "RECOVERY": EventType.MARKED_VARIABILITY,
+}
+
+SEVERITY_API_TO_CORE = {
+    "MILD": EventSeverity.MILD,
+    "MODERATE": EventSeverity.MODERATE,
+    "SEVERE": EventSeverity.SEVERE,
+}
+
+
+def _build_event_parameters(
+    event_type: EventType,
+    severity: EventSeverity,
+    duration: int,
+) -> EventParameters:
+    """Create event parameter presets matching UI selections."""
+
+    def _with_duration(params: EventParameters) -> EventParameters:
+        params.duration_seconds = duration or params.duration_seconds
+        return params
+
+    if event_type == EventType.LATE_DECELERATION:
+        factory = {
+            EventSeverity.MILD: LateDecelerationParams.mild,
+            EventSeverity.MODERATE: LateDecelerationParams.moderate,
+            EventSeverity.SEVERE: LateDecelerationParams.severe,
+        }.get(severity, LateDecelerationParams.moderate)
+        return _with_duration(factory())
+
+    if event_type == EventType.VARIABLE_DECELERATION:
+        factory = {
+            EventSeverity.MILD: VariableDecelerationParams.mild,
+            EventSeverity.MODERATE: VariableDecelerationParams.moderate,
+            EventSeverity.SEVERE: VariableDecelerationParams.severe,
+        }.get(severity, VariableDecelerationParams.moderate)
+        return _with_duration(factory())
+
+    if event_type == EventType.PROLONGED_DECELERATION:
+        factory = {
+            EventSeverity.MILD: ProlongedDecelerationParams.moderate,
+            EventSeverity.MODERATE: ProlongedDecelerationParams.moderate,
+            EventSeverity.SEVERE: ProlongedDecelerationParams.severe,
+        }.get(severity, ProlongedDecelerationParams.moderate)
+        return _with_duration(factory())
+
+    if event_type == EventType.BRADYCARDIA:
+        factory = {
+            EventSeverity.MILD: BradycardiaParams.mild,
+            EventSeverity.MODERATE: BradycardiaParams.moderate,
+            EventSeverity.SEVERE: BradycardiaParams.severe,
+        }.get(severity, BradycardiaParams.moderate)
+        return _with_duration(factory())
+
+    if event_type == EventType.TACHYCARDIA:
+        factory = {
+            EventSeverity.MILD: TachycardiaParams.mild,
+            EventSeverity.MODERATE: TachycardiaParams.moderate,
+            EventSeverity.SEVERE: TachycardiaParams.severe,
+        }.get(severity, TachycardiaParams.moderate)
+        return _with_duration(factory())
+
+    if event_type == EventType.MINIMAL_VARIABILITY:
+        if severity == EventSeverity.SEVERE:
+            return _with_duration(VariabilityParams.absent())
+        if severity == EventSeverity.MILD:
+            return _with_duration(VariabilityParams.marked())
+        return _with_duration(VariabilityParams.minimal())
+
+    if event_type == EventType.ABSENT_VARIABILITY:
+        return _with_duration(VariabilityParams.absent())
+
+    if event_type == EventType.MARKED_VARIABILITY:
+        return _with_duration(VariabilityParams.marked())
+
+    if event_type == EventType.SINUSOIDAL_PATTERN:
+        return _with_duration(SinusoidalParams.typical())
+
+    if event_type == EventType.TACHYSYSTOLE:
+        factory = {
+            EventSeverity.MILD: TachysystoleParams.mild,
+            EventSeverity.MODERATE: TachysystoleParams.mild,
+            EventSeverity.SEVERE: TachysystoleParams.severe,
+        }.get(severity, TachysystoleParams.mild)
+        return _with_duration(factory())
+
+    return _with_duration(EventParameters(duration_seconds=duration, severity=severity))
 
 
 class OrchestratorAdapter:
@@ -198,6 +306,23 @@ class OrchestratorAdapter:
                 trend_score = trend_data.get('deterioration_score', 0)
                 trend_slope = trend_data.get('variability_slope', 0)
             
+            explanation = result.get('explanation')
+            highlight_regions = None
+            if DATA_BRIDGE_AVAILABLE:
+                try:
+                    bridge = get_data_bridge()
+                    snapshot = bridge.get_latest(patient_id)
+                    if snapshot is not None:
+                        explanation = snapshot.explanation or explanation
+                        regions = getattr(snapshot, 'highlight_regions', None)
+                        if regions is not None:
+                            highlight_regions = [
+                                r.to_dict() if hasattr(r, 'to_dict') else r
+                                for r in regions
+                            ]
+                except Exception:
+                    pass
+
             update = {
                 "type": "patient_update",
                 "timestamp": time.time(),
@@ -214,6 +339,8 @@ class OrchestratorAdapter:
                 "mhr_alert": mhr_alert,
                 "trend_score": trend_score,
                 "trend_slope": trend_slope,
+                "explanation": explanation,
+                "highlight_regions": highlight_regions,
             }
             
             push_to_websocket(update)
@@ -403,15 +530,18 @@ class OrchestratorAdapter:
             return False
         
         try:
-            # Convert string to EventType enum
-            event_enum = EventType[event_type]
-            
-            # Create parameters
-            event_params = EventParameters(
-                severity=params.get('severity', 'moderate') if params else 'moderate',
-                depth=params.get('depth', 30) if params else 30,
-                duration_seconds=duration,
-            )
+            # Convert API alias to core enum
+            event_enum = EVENT_TYPE_API_TO_CORE.get(event_type)
+            if event_enum is None:
+                event_enum = EventType[event_type]
+
+            raw_severity = (params or {}).get('severity', 'MODERATE')
+            if isinstance(raw_severity, EventSeverity):
+                severity_enum = raw_severity
+            else:
+                severity_enum = SEVERITY_API_TO_CORE.get(str(raw_severity).upper(), EventSeverity.MODERATE)
+
+            event_params = _build_event_parameters(event_enum, severity_enum, duration)
             
             # Inject event
             result = self._orchestrator.inject_event(

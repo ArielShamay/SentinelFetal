@@ -228,14 +228,20 @@ class FHRGenerator:
             return fhr
         
         params: LateDecelerationParams = event.params
+        forced_remaining = getattr(event, 'forced_contractions_remaining', None)
         
         for i, is_peak in enumerate(contraction_peaks):
             if not is_peak:
                 continue
-            
-            # Random recurrence based on rate
-            if self._rng.random() > params.recurrence_rate:
-                continue
+
+            if forced_remaining is not None:
+                if forced_remaining <= 0:
+                    continue
+                forced_remaining -= 1
+            else:
+                # Random recurrence based on rate
+                if self._rng.random() > params.recurrence_rate:
+                    continue
             
             peak_time = times[i]
             nadir_time = peak_time + params.lag_seconds
@@ -252,6 +258,11 @@ class FHRGenerator:
             significant_mask = decel_shape > 0.01
             fhr[significant_mask] -= params.depth_bpm * decel_shape[significant_mask]
         
+        if forced_remaining is not None:
+            event.forced_contractions_remaining = forced_remaining
+            if forced_remaining <= 0 and len(times) > 0:
+                event.end_time = min(event.end_time, times[-1])
+
         return fhr
     
     def _apply_variable_deceleration(
@@ -271,13 +282,19 @@ class FHRGenerator:
             return fhr
         
         params: VariableDecelerationParams = event.params
+        forced_remaining = getattr(event, 'forced_contractions_remaining', None)
         
         for i, is_peak in enumerate(contraction_peaks):
             if not is_peak:
                 continue
-            
-            if self._rng.random() > params.recurrence_rate:
-                continue
+
+            if forced_remaining is not None:
+                if forced_remaining <= 0:
+                    continue
+                forced_remaining -= 1
+            else:
+                if self._rng.random() > params.recurrence_rate:
+                    continue
             
             peak_time = times[i]
             
@@ -329,6 +346,11 @@ class FHRGenerator:
                     os_shape = np.exp(-0.5 * (t_os / 5.0) ** 2)
                     fhr[overshoot_mask] += 15.0 * os_shape
         
+        if forced_remaining is not None:
+            event.forced_contractions_remaining = forced_remaining
+            if forced_remaining <= 0 and len(times) > 0:
+                event.end_time = min(event.end_time, times[-1])
+
         return fhr
     
     def _apply_early_deceleration(
@@ -348,13 +370,19 @@ class FHRGenerator:
             return fhr
         
         params: EarlyDecelerationParams = event.params
+        forced_remaining = getattr(event, 'forced_contractions_remaining', None)
         
         for i, is_peak in enumerate(contraction_peaks):
             if not is_peak:
                 continue
-            
-            if self._rng.random() > params.recurrence_rate:
-                continue
+
+            if forced_remaining is not None:
+                if forced_remaining <= 0:
+                    continue
+                forced_remaining -= 1
+            else:
+                if self._rng.random() > params.recurrence_rate:
+                    continue
             
             peak_time = times[i]
             
@@ -366,6 +394,11 @@ class FHRGenerator:
             significant_mask = decel_shape > 0.01
             fhr[significant_mask] -= params.depth_bpm * decel_shape[significant_mask]
         
+        if forced_remaining is not None:
+            event.forced_contractions_remaining = forced_remaining
+            if forced_remaining <= 0 and len(times) > 0:
+                event.end_time = min(event.end_time, times[-1])
+
         return fhr
     
     def _apply_prolonged_deceleration(

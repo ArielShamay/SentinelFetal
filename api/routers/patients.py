@@ -41,13 +41,20 @@ def _patient_to_snapshot(patient, patient_data: dict, orchestrator) -> PatientSn
     now = time.time()
     
     # Extract metrics
-    fhr_data = patient_data.get("fhr", [])
-    uc_data = patient_data.get("uc", [])
-    timestamps = patient_data.get("timestamps", [])
-    
+    def _to_list(values):
+        if hasattr(values, "tolist"):
+            return values.tolist()
+        if isinstance(values, (list, tuple)):
+            return list(values)
+        return []
+
+    fhr_history = _to_list(patient_data.get("fhr", []))
+    uc_history = _to_list(patient_data.get("uc", []))
+    timestamps = _to_list(patient_data.get("timestamps", []))
+
     # Handle numpy arrays - check length instead of truthiness
-    current_fhr = fhr_data[-1] if len(fhr_data) > 0 else 140.0
-    current_uc = uc_data[-1] if len(uc_data) > 0 else 0.0
+    current_fhr = fhr_history[-1] if len(fhr_history) > 0 else 140.0
+    current_uc = uc_history[-1] if len(uc_history) > 0 else 0.0
     
     # Get patient state
     category = patient_data.get("category", 1)
@@ -81,16 +88,41 @@ def _patient_to_snapshot(patient, patient_data: dict, orchestrator) -> PatientSn
         category=category,
         category_name=_category_to_name(category),
         metrics=metrics,
-        fhr_history=fhr_data[-1200:],  # Last 5 minutes at 4Hz
-        uc_history=uc_data[-1200:],
-        timestamps=timestamps[-1200:],
+        fhr_history=fhr_history,
+        uc_history=uc_history,
+        timestamps=timestamps,
         alerts=alerts,
         trend_data=patient_data.get("trend_data"),
         explanation=patient_data.get("explanation"),
+        highlight_regions=patient_data.get("highlight_regions"),
         fsqi_score=patient_data.get("fsqi", 1.0),
         has_active_event=orchestrator.has_active_event(patient_data.get("patient_id", "")),
         last_update=now,
     )
+
+
+def _merge_bridge_snapshot(patient_data: dict, bridge_snapshot: Optional[object]) -> None:
+    """Merge DataBridge snapshot fields into patient_data in-place."""
+    if bridge_snapshot is None:
+        return
+
+    try:
+        patient_data["category"] = getattr(bridge_snapshot, "category", patient_data.get("category", 1))
+        patient_data["trend_data"] = getattr(bridge_snapshot, "trend_data", patient_data.get("trend_data"))
+        patient_data["explanation"] = getattr(bridge_snapshot, "explanation", patient_data.get("explanation"))
+
+        alerts = getattr(bridge_snapshot, "alerts", None)
+        if alerts is not None:
+            patient_data["alerts"] = alerts
+
+        regions = getattr(bridge_snapshot, "highlight_regions", None)
+        if regions is not None:
+            patient_data["highlight_regions"] = [
+                r.to_dict() if hasattr(r, "to_dict") else r
+                for r in regions
+            ]
+    except Exception as exc:
+        logger.debug(f"Failed to merge DataBridge snapshot: {exc}")
 
 
 def _patient_to_summary(patient, patient_data: dict) -> PatientSummary:
@@ -137,10 +169,12 @@ async def list_patients(
         patient_id = patient_info.get("patient_id")
         patient = orchestrator.get_patient(patient_id)
         patient_data = orchestrator.get_patient_data(patient_id, duration_minutes)
+        bridge_snapshot = orchestrator.get_patient_snapshot(patient_id)
         
         if patient_data:
             # Merge status info with data
             patient_data.update(patient_info)
+            _merge_bridge_snapshot(patient_data, bridge_snapshot)
             snapshots.append(_patient_to_snapshot(patient, patient_data, orchestrator))
     
     return PatientList(
@@ -201,6 +235,9 @@ async def get_patient(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No data for patient {patient_id}",
         )
+
+    bridge_snapshot = orchestrator.get_patient_snapshot(patient_id)
+    _merge_bridge_snapshot(patient_data, bridge_snapshot)
     
     return _patient_to_snapshot(patient, patient_data, orchestrator)
 

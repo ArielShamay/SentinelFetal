@@ -27,7 +27,7 @@ cd SentinelFetal
 python -m venv .venv && .venv\Scripts\activate  # Windows
 # source .venv/bin/activate  # Linux/macOS
 pip install -r requirements.txt
-uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn api.main:app --reload --host 0.0.0.0 --port 8001
 
 # Frontend (Terminal 2)
 cd frontend
@@ -35,7 +35,7 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173** in your browser.
+Open **http://localhost:3000** in your browser.
 
 ### Quick Start (Docker - Production)
 
@@ -63,7 +63,7 @@ Open **http://localhost** in your browser (frontend: 80, API: 8000).
 |---------|-------------|--------|
 | **MHR Guard** | Detects maternal heart rate contamination via spectral RSA analysis | Backend implemented — UI surfacing pending |
 | **Trend Analyzer** | 60-minute trend tracking with deterioration scoring (0-100) | Backend implemented — UI trend view pending |
-| **Explainability** | Rule-based explanations with visual graph highlighting | Backend implemented — front-end overlays pending |
+| **Explainability** | Rule-based explanations with visual graph highlighting | ✅ Integrated in UI with highlight overlays |
 
 ---
 
@@ -130,13 +130,13 @@ python scripts/deep_endurance_audit.py
 cd SentinelFetal
 .venv\Scripts\activate  # Windows
 # source .venv/bin/activate  # Linux/macOS
-uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn api.main:app --reload --host 0.0.0.0 --port 8001
 
 # Frontend (Terminal 2)
 cd frontend && npm run dev
 ```
 
-Then open **http://localhost:5173** in your browser.
+Then open **http://localhost:3000** in your browser.
 
 ### Production Mode (Docker)
 
@@ -151,7 +151,7 @@ docker-compose up --build
 - **Multi-Patient Grid**: Monitor up to 20 patients simultaneously
 - **Real-Time ECharts**: Dual-track CTG (FHR + UC) with 4Hz updates
 - **Category Badges**: Color-coded I/II/III classification
-- **God Mode**: Inject clinical events (Late Decel, Sinusoidal, etc.) for testing
+- **God Mode**: Inject clinical events (Late Decel, Sinusoidal, etc.) with recurrent sequences for clinical realism
 - **Detail View**: Click any patient for full 10-minute history with zoom
 
 ---

@@ -3,6 +3,7 @@
  */
 
 import type { IChartApi, ISeriesApi } from 'lightweight-charts'
+import type { PatientSnapshot, WSPatientUpdate } from './index'
 
 // Data point for time series
 export interface ChartDataPoint {
@@ -60,6 +61,8 @@ export interface CTGChartProps {
   fhrData?: number[]
   ucData?: number[]
   timestamps?: number[]
+  snapshot?: PatientSnapshot | null
+  liveUpdate?: WSPatientUpdate | null
   highlightRegions?: ChartHighlightRegion[]
   showUC?: boolean
   width?: string | number

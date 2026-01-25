@@ -75,6 +75,7 @@ export interface PatientSnapshot {
   alerts: Alert[]
   trend_data: TrendData | null
   explanation: ExplanationData | null
+  highlight_regions?: HighlightRegion[]
   fsqi_score: number
   has_active_event: boolean
   last_update: number
@@ -116,6 +117,8 @@ export interface WSPatientUpdate {
   mhr_alert?: MHRAlert | null
   trend_score?: number
   trend_slope?: number
+  explanation?: ExplanationData | null
+  highlight_regions?: HighlightRegion[]
 }
 
 // Simulation status

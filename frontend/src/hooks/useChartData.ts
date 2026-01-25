@@ -39,11 +39,26 @@ export function useChartData(options: UseChartDataOptions = {}): ChartDataReturn
    * Append new FHR samples to the buffer
    */
   const appendFHR = useCallback((samples: number[], timestamps?: number[]) => {
+    if (samples.length === 0) return
+
     const currentTime = Date.now() / 1000
     const sampleInterval = 1 / samplingRate
 
+    const effectiveTimestamps = timestamps && timestamps.length === samples.length
+      ? timestamps
+      : null
+
+    const lastPoint = fhrBuffer.current.last()
+    const firstSampleTime = effectiveTimestamps
+      ? effectiveTimestamps[0]
+      : lastPoint
+        ? lastPoint.time + sampleInterval
+        : currentTime - (samples.length - 1) * sampleInterval
+
     samples.forEach((value, i) => {
-      const time = timestamps?.[i] ?? (currentTime - (samples.length - 1 - i) * sampleInterval)
+      const time = effectiveTimestamps
+        ? effectiveTimestamps[i]
+        : firstSampleTime + i * sampleInterval
       fhrBuffer.current.push({ time, value })
     })
   }, [samplingRate])
@@ -52,11 +67,26 @@ export function useChartData(options: UseChartDataOptions = {}): ChartDataReturn
    * Append new UC samples to the buffer
    */
   const appendUC = useCallback((samples: number[], timestamps?: number[]) => {
+    if (samples.length === 0) return
+
     const currentTime = Date.now() / 1000
     const sampleInterval = 1 / samplingRate
 
+    const effectiveTimestamps = timestamps && timestamps.length === samples.length
+      ? timestamps
+      : null
+
+    const lastPoint = ucBuffer.current.last()
+    const firstSampleTime = effectiveTimestamps
+      ? effectiveTimestamps[0]
+      : lastPoint
+        ? lastPoint.time + sampleInterval
+        : currentTime - (samples.length - 1) * sampleInterval
+
     samples.forEach((value, i) => {
-      const time = timestamps?.[i] ?? (currentTime - (samples.length - 1 - i) * sampleInterval)
+      const time = effectiveTimestamps
+        ? effectiveTimestamps[i]
+        : firstSampleTime + i * sampleInterval
       ucBuffer.current.push({ time, value })
     })
   }, [samplingRate])

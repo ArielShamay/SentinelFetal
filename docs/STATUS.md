@@ -1,6 +1,6 @@
 # SentinelFetal V2.0 - System Status Report
 
-**Last Updated:** January 24, 2026
+**Last Updated:** January 25, 2026
 **Document Type:** Reality Check - Backend vs. Frontend Status
 
 ---
@@ -11,6 +11,17 @@
 |-------|--------|------------|
 | **Backend Pipeline** | **Production Ready** | 98.7% accuracy, 58ms P99 latency |
 | **Frontend UI (Streamlit)** | **Pulse Architecture Implemented** | V2.0 features wired, real-time updates |
+
+---
+
+## V3 React UI Status (Clinical Fidelity)
+
+| Area | Status | Notes |
+|------|--------|-------|
+| Dual-axis CTG (FHR right / UC left) | ✅ Implemented | Fixed ranges 50-210 bpm and 0-100 mmHg |
+| Explainability Panel | ✅ Wired | Explanation data plumbed from DataBridge → REST/WS → UI |
+| Visual Markers | ✅ Wired | `highlight_regions` rendered as shaded regions with red boundary lines |
+| God Mode Injection | ✅ Clinically recurrent | Decel injections now repeat across 3–5 contractions (no threshold changes) |
 
 ---
 

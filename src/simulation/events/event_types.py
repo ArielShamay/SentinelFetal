@@ -482,6 +482,7 @@ class InjectedEvent:
     start_time: float
     end_time: float
     is_active: bool = True
+    forced_contractions_remaining: Optional[int] = None
     
     @property
     def remaining_seconds(self) -> float:
@@ -516,7 +517,8 @@ class InjectedEvent:
             'end_time': self.end_time,
             'duration_seconds': self.duration_seconds,
             'severity': self.params.severity.name if hasattr(self.params, 'severity') else None,
-            'is_active': self.is_active
+            'is_active': self.is_active,
+            'forced_contractions_remaining': self.forced_contractions_remaining,
         }
     
     def __repr__(self) -> str:

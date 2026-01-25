@@ -187,6 +187,26 @@ class PatientGenerator:
             The created InjectedEvent object.
         """
         duration = duration_seconds or params.duration_seconds
+        forced_contractions_remaining: Optional[int] = None
+
+        # For deceleration events, enforce a recurrent sequence over
+        # the next 3-5 contractions to meet clinical recurrence criteria.
+        if event_type in {
+            EventType.LATE_DECELERATION,
+            EventType.VARIABLE_DECELERATION,
+            EventType.EARLY_DECELERATION,
+        }:
+            forced_contractions_remaining = int(np.random.randint(3, 6))
+
+            # Ensure recurrence rate is high during the forced sequence
+            if hasattr(params, 'recurrence_rate'):
+                params.recurrence_rate = 1.0
+
+            # Extend duration to cover the next 3-5 contractions (~10-15 minutes)
+            contractions_per_10min = max(self._uc_generator.config.contractions_per_10min, 0.5)
+            mean_interval = 600.0 / contractions_per_10min
+            min_duration = mean_interval * (forced_contractions_remaining + 1)
+            duration = max(duration, min_duration)
         
         event = InjectedEvent(
             event_type=event_type,
@@ -194,7 +214,8 @@ class PatientGenerator:
             patient_id=self.patient_id,
             start_time=self._simulation_time,
             end_time=self._simulation_time + duration,
-            is_active=True
+            is_active=True,
+            forced_contractions_remaining=forced_contractions_remaining,
         )
         
         with self._event_lock:

@@ -3,7 +3,7 @@
  */
 
 import { useRef, useEffect, useCallback } from 'react'
-import { createChart, IChartApi, ISeriesApi, LineData, Time } from 'lightweight-charts'
+import { createChart, IChartApi, ISeriesApi, LineData, Time, PriceScaleMode } from 'lightweight-charts'
 import { DEFAULT_CHART_OPTIONS, LIGHT_CHART_OPTIONS, FHR_SERIES_OPTIONS, UC_SERIES_OPTIONS } from '../utils/chartConfig'
 import type { ChartDataPoint } from '../types/chart'
 
@@ -64,36 +64,51 @@ export function useLightweightChart(options: UseLightweightChartOptions): ChartR
     // Create FHR series (top pane)
     const fhrSeries = chart.addLineSeries({
       ...FHR_SERIES_OPTIONS,
-      priceScaleId: 'fhr',
+      priceScaleId: 'right',
     })
     fhrSeriesRef.current = fhrSeries
+    fhrSeries.applyOptions({
+      autoscaleInfoProvider: () => ({
+        priceRange: { minValue: 50, maxValue: 210 },
+      }),
+    })
 
     // Create UC series (bottom pane)
     const ucSeries = chart.addLineSeries({
       ...UC_SERIES_OPTIONS,
-      priceScaleId: 'uc',
+      priceScaleId: 'left',
     })
     ucSeriesRef.current = ucSeries
+    ucSeries.applyOptions({
+      autoscaleInfoProvider: () => ({
+        priceRange: { minValue: 0, maxValue: 100 },
+      }),
+    })
 
     // Configure price scales with theme-appropriate colors
     const borderColor = darkMode ? '#3d3d3d' : '#e5e7eb'
 
-    chart.priceScale('fhr').applyOptions({
+    const fhrScale = chart.priceScale('right')
+    fhrScale.applyOptions({
       scaleMargins: {
         top: 0.05,
         bottom: 0.55,
       },
       borderVisible: true,
       borderColor,
+      mode: PriceScaleMode.Normal,
+      visible: true,
     })
-
-    chart.priceScale('uc').applyOptions({
+    const ucScale = chart.priceScale('left')
+    ucScale.applyOptions({
       scaleMargins: {
         top: 0.55,
         bottom: 0.05,
       },
       borderVisible: true,
       borderColor,
+      mode: PriceScaleMode.Normal,
+      visible: true,
     })
 
     // Handle resize
@@ -176,7 +191,6 @@ export function useLightweightChart(options: UseLightweightChartOptions): ChartR
     const center = (from + to) / 2
     const newFrom = center - newRange / 2
     const newTo = center + newRange / 2
-
     timeScale.setVisibleLogicalRange({ from: newFrom, to: newTo })
   }, [])
 

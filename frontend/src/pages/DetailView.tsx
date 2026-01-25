@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { usePatientStore } from '../stores'
 import { CategoryBadge, CTGChart, ChartControls, TrendPanel, ExplanationPanel } from '../components'
 import { api } from '../services'
-import type { PatientSnapshot, Alert } from '../types'
+import type { PatientSnapshot, Alert, WSPatientUpdate } from '../types'
 
 export const DetailView: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>()
@@ -21,46 +21,59 @@ export const DetailView: React.FC = () => {
   const [detail, setDetail] = useState<PatientSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const updateSnapshot = usePatientStore(state => state.updatePatientSnapshot)
   
   // Check for MHR detection
   const isMHR = liveUpdate?.mhr_alert?.is_mhr ?? false
+
+  const hasFallbackData = Boolean(
+    (patientId && patient && patient.patient_id === patientId) ||
+    (detail && detail.patient_id === patientId) ||
+    liveUpdate
+  )
   
-  // Fetch full patient detail (only if no live data available)
+  // Fetch full patient detail with extended history
   useEffect(() => {
     if (!patientId) return
-    
-    // If we have live data from WebSocket, use it instead of fetching
-    const liveData = liveUpdate
-    if (liveData) {
-      setLoading(false)
-      return
-    }
-    
-    setLoading(true)
+    let cancelled = false
+
     setError(null)
-    
-    api.getPatientSnapshot(patientId)
+    setDetail(prev => (prev && prev.patient_id !== patientId ? null : prev))
+    const fallbackAvailable = Boolean(
+      (patientId && patient && patient.patient_id === patientId) ||
+      (detail && detail.patient_id === patientId) ||
+      liveUpdate
+    )
+
+    setLoading(!fallbackAvailable)
+
+    api.getPatientSnapshot(patientId, 60)
       .then((data: PatientSnapshot) => {
+        if (cancelled) return
         setDetail(data)
+        updateSnapshot(data)
         setLoading(false)
       })
       .catch((err: Error) => {
-        // If API fails but we have WebSocket data, use that
-        if (liveUpdate) {
-          setLoading(false)
-          setError(null)
-        } else {
+        if (cancelled) return
+        if (!fallbackAvailable) {
           setError(err.message || 'Failed to load patient details')
-          setLoading(false)
         }
+        setLoading(false)
       })
-  }, [patientId, liveUpdate])
+
+    return () => {
+      cancelled = true
+    }
+  }, [patientId, updateSnapshot])
   
   if (!patientId) {
     return <NotFoundState onBack={() => navigate('/')} />
   }
   
-  if (loading) {
+  const hasAnyData = hasFallbackData
+
+  if (loading && !hasAnyData) {
     return <LoadingState />
   }
   
@@ -155,7 +168,13 @@ export const DetailView: React.FC = () => {
           {/* Main vitals panel */}
           <div className="lg:col-span-2 space-y-6">
             <VitalsPanel patient={currentData} />
-            <CTGChartPanel />
+            {patientId && (
+              <CTGChartPanel
+                patientId={patientId}
+                snapshot={currentData}
+                liveUpdate={liveUpdate}
+              />
+            )}
           </div>
           
           {/* Sidebar */}
@@ -180,11 +199,11 @@ export const DetailView: React.FC = () => {
               } : undefined}
             />
             <ExplanationPanel 
-              data={currentData.explanation ? {
-                category: currentData.category,
-                primaryReason: currentData.explanation.primary_reason,
-                factors: currentData.explanation.contributing_factors,
-                confidence: currentData.explanation.confidence,
+              data={(currentData.explanation ?? liveUpdate?.explanation) ? {
+                category: currentData.category ?? liveUpdate?.category ?? 1,
+                primaryReason: (currentData.explanation ?? liveUpdate?.explanation)?.primary_reason ?? '',
+                factors: (currentData.explanation ?? liveUpdate?.explanation)?.contributing_factors ?? [],
+                confidence: (currentData.explanation ?? liveUpdate?.explanation)?.confidence ?? 0,
               } : undefined}
             />
             <EventsPanel alerts={currentData.alerts ?? []} />
@@ -298,7 +317,11 @@ const VitalCard: React.FC<VitalCardProps> = ({
 )
 
 // CTG Chart Panel - Real-time FHR/UC visualization
-const CTGChartPanel: React.FC = () => {
+const CTGChartPanel: React.FC<{
+  patientId: string
+  snapshot: PatientSnapshot
+  liveUpdate?: WSPatientUpdate | null
+}> = ({ patientId, snapshot, liveUpdate }) => {
   const [timeRange, setTimeRange] = useState<number | null>(10)
   
   const handleZoomIn = useCallback(() => {
@@ -329,6 +352,12 @@ const CTGChartPanel: React.FC = () => {
         </div>
       </div>
       <CTGChart
+        patientId={patientId}
+        snapshot={snapshot}
+        liveUpdate={liveUpdate ?? null}
+        fhrData={snapshot.fhr_history}
+        ucData={snapshot.uc_history}
+        timestamps={snapshot.timestamps}
         height={350}
         showControls={true}
         isLive={true}

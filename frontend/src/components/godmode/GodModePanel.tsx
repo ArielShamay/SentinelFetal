@@ -2,7 +2,7 @@
  * God Mode Panel - Event injection interface for demonstrations
  */
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { usePatientStore } from '../../stores'
@@ -33,15 +33,54 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
   onToggle,
 }) => {
   const { t } = useTranslation()
-  
-  const patients = usePatientStore(state => Array.from(state.patients.keys()))
-  
   const [eventType, setEventType] = useState<EventType | ''>('')
   const [severity, setSeverity] = useState<Severity>('moderate')
   const [duration, setDuration] = useState(120) // seconds
   const [targetPatient, setTargetPatient] = useState<string>('')
   const [isInjecting, setIsInjecting] = useState(false)
 
+  const snapshotIds = usePatientStore(state => Array.from(state.patients.keys()))
+  const summaryList = usePatientStore(state => Array.from(state.patientSummaries.values()))
+  const liveIds = usePatientStore(state => Array.from(state.liveUpdates.keys()))
+  const updateSummaries = usePatientStore(state => state.updatePatientSummaries)
+
+  const patientOptions = useMemo(() => {
+    const ids = new Set<string>()
+    summaryList.forEach(summary => ids.add(summary.patient_id))
+    snapshotIds.forEach(id => ids.add(id))
+    liveIds.forEach(id => ids.add(id))
+    return Array.from(ids).sort()
+  }, [summaryList, snapshotIds, liveIds])
+
+  useEffect(() => {
+    if (summaryList.length > 0) {
+      return
+    }
+
+    let cancelled = false
+
+    api.getPatientsSummary()
+      .then(response => {
+        if (cancelled) return
+        updateSummaries(response.patients)
+      })
+      .catch(error => {
+        console.warn('Failed to fetch patient summaries for God Mode:', error)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [summaryList.length, updateSummaries])
+
+  useEffect(() => {
+    if (!targetPatient && patientOptions.length > 0) {
+      setTargetPatient(patientOptions[0])
+    } else if (targetPatient && !patientOptions.includes(targetPatient)) {
+      setTargetPatient(patientOptions[0] ?? '')
+    }
+  }, [patientOptions, targetPatient])
+  
   // Get detection time for selected event
   const detectionTime = EVENT_TYPES.find(e => e.id === eventType)?.detectionTime ?? 0
 
@@ -72,7 +111,8 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
       
     } catch (error) {
       console.error('Event injection failed:', error)
-      toast.error(t('godmode.error'))
+      const message = error instanceof Error ? error.message : t('godmode.error')
+      toast.error(message)
     } finally {
       setIsInjecting(false)
     }
@@ -193,7 +233,7 @@ export const GodModePanel: React.FC<GodModePanelProps> = ({
             className="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           >
             <option value="">{t('godmode.selectPatient')}</option>
-            {patients.map(id => (
+            {patientOptions.map(id => (
               <option key={id} value={id}>{id}</option>
             ))}
           </select>

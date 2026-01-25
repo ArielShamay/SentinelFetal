@@ -1,56 +1,71 @@
-import { useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Outlet } from 'react-router-dom'
 import { Header } from './Header'
 import { GodModePanel } from '../godmode'
-import { useGodMode } from '../../stores'
+import { useGodMode, useUIStore } from '../../stores'
 
 export function Layout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [panelCollapsed, setPanelCollapsed] = useState(false)
   const godModeEnabled = useGodMode()
-  const location = useLocation()
-  
-  // Only show sidebar toggle on ward view
-  const showSidebarToggle = location.pathname === '/' && godModeEnabled
+  const toggleGodMode = useUIStore(state => state.toggleGodMode)
+
+  useEffect(() => {
+    if (!godModeEnabled) {
+      toggleGodMode()
+    }
+  }, [godModeEnabled, toggleGodMode])
+
+  const showPanel = godModeEnabled
 
   return (
     <div className="min-h-screen bg-white">
       <Header
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-        showSidebarToggle={showSidebarToggle}
-        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setPanelCollapsed(prev => !prev)}
+        showSidebarToggle={showPanel}
+        sidebarOpen={!panelCollapsed}
       />
       <div className="flex">
         {/* Main content */}
-        <main className={`flex-1 transition-all duration-300 ${sidebarOpen && showSidebarToggle ? 'mr-80' : ''}`}>
+        <main className="flex-1">
           <div className="container mx-auto px-4 py-6">
             <Outlet />
           </div>
         </main>
-
-        {/* Sidebar - God Mode Panel */}
-        {showSidebarToggle && (
-          <aside
-            className={`
-              fixed right-0 top-16 bottom-0 w-80 bg-gray-100 border-l border-gray-300
-              transform transition-transform duration-300 overflow-y-auto shadow-lg
-              ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}
-            `}
-          >
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">God Mode</h2>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-900"
-                >
-                  ✕
-                </button>
-              </div>
-              <GodModePanel />
-            </div>
-          </aside>
-        )}
       </div>
+
+      {showPanel && (
+        <div className="fixed bottom-6 right-6 z-50 pointer-events-none">
+          {panelCollapsed ? (
+            <button
+              onClick={() => setPanelCollapsed(false)}
+              className="pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-full bg-purple-600 text-white shadow-lg hover:bg-purple-700 transition-colors"
+              title="Show God Mode"
+            >
+              ⚡ God Mode
+            </button>
+          ) : (
+            <div className="pointer-events-auto w-[22rem] max-w-[calc(100vw-3rem)]">
+              <div className="bg-white border border-gray-300 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-200">
+                  <h2 className="text-base font-semibold text-gray-900">God Mode</h2>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPanelCollapsed(true)}
+                      className="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300 text-gray-700"
+                      title="Minimize God Mode"
+                    >
+                      Hide
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-[70vh] overflow-y-auto p-4 bg-white">
+                  <GodModePanel />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
