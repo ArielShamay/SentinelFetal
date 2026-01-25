@@ -1,0 +1,8 @@
+aggregation_mode: any
+objective: F2
+threshold: 0.65
+timestamp: '2026-01-25T17:10:07.515519'
+weights:
+  random_forest: 0.65
+  sgd_classifier: 0.25
+  xgboost: 0.1

@@ -1,0 +1,10 @@
+aggregation_mode: persistence
+feature_spec: v5_super_features
+objective: F2
+study_best_value: 0.6221889055472264
+threshold: 0.3844
+timestamp: '2026-01-25T19:40:11.331427+00:00'
+weights:
+  random_forest: 0.1041
+  sgd_classifier: 0.1463
+  xgboost: 0.7495

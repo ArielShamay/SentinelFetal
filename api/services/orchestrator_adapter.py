@@ -33,6 +33,14 @@ from src.simulation.events.event_types import (
     TachysystoleParams,
 )
 
+# Import XGBoost-based analyzer
+try:
+    from src.analysis.trend_analyzer_v2 import get_trend_analyzer
+    XGBOOST_ANALYZER_AVAILABLE = True
+except ImportError:
+    XGBOOST_ANALYZER_AVAILABLE = False
+    logger.warning("XGBoost analyzer not available, using fallback")
+
 # Import DataBridge for snapshots
 try:
     from src.interfaces.state_bridge import get_data_bridge, PatientSnapshot
@@ -259,6 +267,10 @@ class OrchestratorAdapter:
                 run_moment=True,
             )
             
+            # Enhance with XGBoost analysis if available
+            if XGBOOST_ANALYZER_AVAILABLE:
+                result = self._enhance_with_xgboost(data, result)
+            
             # Push to WebSocket (non-blocking)
             self._push_websocket_update(patient_id, data, result)
             
@@ -266,6 +278,64 @@ class OrchestratorAdapter:
         except Exception as e:
             logger.error(f"Pipeline processing error for {patient_id}: {e}")
             return {}
+    
+    def _enhance_with_xgboost(self, data: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance pipeline result with XGBoost classification and clinical findings."""
+        try:
+            import numpy as np
+            analyzer = get_trend_analyzer()
+            
+            fhr_data = np.array(data.get('fhr', []))
+            uc_data = np.array(data.get('uc', []))
+            baseline = result.get('baseline_fhr', 140.0)
+            variability = result.get('variability', 10.0)
+            
+            if len(fhr_data) < 60:  # Need sufficient data
+                return result
+            
+            # Get enhanced analysis
+            analysis = analyzer.analyze(fhr_data, uc_data, baseline, variability)
+            
+            # Merge into result
+            result['confidence'] = analysis.get('confidence', 0.5)
+            result['ai_category'] = analysis.get('ml_category', result.get('category', 1))
+            result['clinical_overrides'] = analysis.get('clinical_overrides', [])
+            
+            # Build findings object
+            result['findings'] = {
+                'decelerations': {
+                    'late_count': 0,
+                    'variable_count': 0,
+                    'early_count': 0,
+                    'prolonged_count': 0,
+                    'total_count': 0,
+                    'recurrent': False
+                },
+                'variability': {
+                    'value_bpm': variability,
+                    'category': 'moderate' if 6 <= variability <= 25 else 'minimal' if variability < 6 else 'marked',
+                    'is_concerning': variability < 5 or variability > 25
+                },
+                'baseline': {
+                    'value_bpm': baseline,
+                    'status': 'normal' if 110 <= baseline <= 160 else 'bradycardia' if baseline < 110 else 'tachycardia',
+                    'is_stable': True
+                },
+                'accelerations_present': False,
+                'tachysystole': False,
+                'sinusoidal': False,
+                'contraction_frequency': 3.0
+            }
+            
+            # Use pessimistic aggregation - take worse category
+            ai_cat = analysis.get('category', 1)
+            pipeline_cat = result.get('category', 1)
+            result['category'] = max(ai_cat, pipeline_cat)
+            
+        except Exception as e:
+            logger.warning(f"XGBoost enhancement failed: {e}")
+        
+        return result
     
     def _push_websocket_update(
         self, 

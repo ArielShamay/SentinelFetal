@@ -104,7 +104,8 @@ class PipelineContainer:
     def create_default(
         cls,
         use_mock_moment: bool = False,
-        model_path: str = "models/sentinel_classifier.json"
+        model_path: str = "models/sentinel_classifier.json",
+        use_ensemble_v4: bool = False
     ) -> 'PipelineContainer':
         """
         Create container with default implementations.
@@ -115,6 +116,8 @@ class PipelineContainer:
         Args:
             use_mock_moment: Use mock MOMENT (for testing without GPU).
             model_path: Path to trained XGBoost model file.
+            use_ensemble_v4: Use V4.0 Hybrid Ensemble (XGBoost + RF + SGD)
+                            instead of single XGBoost classifier.
             
         Returns:
             Configured PipelineContainer ready for use.
@@ -122,7 +125,17 @@ class PipelineContainer:
         Example:
             >>> container = PipelineContainer.create_default(use_mock_moment=True)
             >>> pipeline = AnalysisPipeline(container)
+            
+            # Use V4.0 ensemble:
+            >>> container = PipelineContainer.create_default(use_ensemble_v4=True)
         """
+        # Select classifier based on configuration
+        if use_ensemble_v4:
+            from src.adapters import EnsembleClassifierAdapter
+            classifier = EnsembleClassifierAdapter()
+        else:
+            classifier = ClassifierAdapter(model_path=model_path)
+        
         return cls(
             # Data layer
             preprocessor=PreprocessorAdapter(),
@@ -137,7 +150,7 @@ class PipelineContainer:
             # Model layer
             feature_extractor=MomentAdapter(use_mock=use_mock_moment),
             feature_fusion=FusionAdapter(),
-            classifier=ClassifierAdapter(model_path=model_path),
+            classifier=classifier,
             
             # Analysis layer
             medical_override=OverrideAdapter(),

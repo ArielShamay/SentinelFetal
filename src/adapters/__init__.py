@@ -31,6 +31,10 @@ from .data_adapters import (
     DataLoaderAdapter,
     PreprocessorAdapter,
 )
+from .ensemble_adapter import (
+    EnsembleClassifierAdapter,
+    create_ensemble_classifier,
+)
 
 __all__ = [
     # Rule adapters
@@ -43,6 +47,9 @@ __all__ = [
     'MomentAdapter',
     'ClassifierAdapter',
     'FusionAdapter',
+    # Ensemble adapter (V4.0)
+    'EnsembleClassifierAdapter',
+    'create_ensemble_classifier',
     # Analysis adapters
     'OverrideAdapter',
     'AlertAdapter',

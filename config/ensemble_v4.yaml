@@ -1,0 +1,169 @@
+# =============================================================================
+# SentinelFetal V4.0 — Hybrid Ensemble ML Engine Configuration
+# =============================================================================
+# Authority: Production Configuration
+# Last Updated: 2026-01-25
+# DO NOT MODIFY WITHOUT CLINICAL/ML REVIEW APPROVAL
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Ensemble Model Weights (Weighted Soft Voting)
+# Sum MUST equal 1.0
+# -----------------------------------------------------------------------------
+ensemble:
+  weights:
+    xgboost: 0.4      # Boosting-based, cost-sensitive
+    random_forest: 0.3 # Bagging-based, balanced subsample
+    sgd_classifier: 0.3 # Linear classifier, high-dimensional safe
+  
+  # Aggregation method (V4.0 only supports soft_voting)
+  aggregation_method: "soft_voting"
+
+# -----------------------------------------------------------------------------
+# Risk Thresholds (Probability-based)
+# These define alert levels based on ensemble risk score
+# -----------------------------------------------------------------------------
+thresholds:
+  critical: 0.60      # P > 0.60 → Critical Alert (Category III)
+  warning: 0.35       # 0.35 < P ≤ 0.60 → Warning / Monitor (Category II)
+  normal: 0.35        # P ≤ 0.35 → Normal (Category I)
+
+# -----------------------------------------------------------------------------
+# Category Mapping
+# -----------------------------------------------------------------------------
+categories:
+  1: 
+    name: "Normal"
+    color: "green"
+    action: "Continue monitoring"
+  2:
+    name: "Suspicious"  
+    color: "yellow"
+    action: "Enhanced monitoring recommended"
+  3:
+    name: "Pathological"
+    color: "red"
+    action: "Immediate clinical attention required"
+
+# -----------------------------------------------------------------------------
+# Training Configuration
+# -----------------------------------------------------------------------------
+training:
+  # Random seeds for reproducibility
+  seeds:
+    global: 42
+    xgboost: 42
+    random_forest: 43
+    sgd: 44
+    smote: 45
+    cv_split: 46
+  
+  # Nested Cross-Validation settings
+  cross_validation:
+    outer_folds: 10    # Evaluation loop
+    inner_folds: 5     # Hyperparameter tuning (if enabled)
+    stratified: true
+    shuffle: true
+  
+  # SMOTE Configuration (Applied ONLY in inner training loop)
+  smote:
+    enabled: true
+    k_neighbors: 5
+    sampling_strategy: "auto"  # Balance all minority classes
+  
+  # Probability Calibration
+  calibration:
+    enabled: true
+    method: "sigmoid"          # Platt Scaling (default)
+    # method: "isotonic"       # Use only if positives >= 50
+    cv_folds: 3
+
+# -----------------------------------------------------------------------------
+# Model Hyperparameters
+# -----------------------------------------------------------------------------
+models:
+  xgboost:
+    n_estimators: 200
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 3
+    gamma: 0.1
+    reg_alpha: 0.1
+    reg_lambda: 1.0
+    scale_pos_weight: 3.5      # Cost-sensitive for class imbalance
+    objective: "binary:logistic"
+    eval_metric: "auc"
+    use_label_encoder: false
+    verbosity: 0
+  
+  random_forest:
+    n_estimators: 200
+    max_depth: 12
+    min_samples_split: 5
+    min_samples_leaf: 2
+    max_features: "sqrt"
+    class_weight: "balanced_subsample"
+    bootstrap: true
+    oob_score: true
+    n_jobs: -1
+    verbose: 0
+  
+  sgd_classifier:
+    loss: "modified_huber"     # Probability estimates + robustness
+    penalty: "l2"
+    alpha: 0.0001
+    max_iter: 1000
+    tol: 0.001
+    class_weight: "balanced"
+    early_stopping: true
+    validation_fraction: 0.1
+    n_iter_no_change: 5
+    average: true              # Averaged SGD for stability
+
+# -----------------------------------------------------------------------------
+# Inference Configuration
+# -----------------------------------------------------------------------------
+inference:
+  # Performance constraints
+  max_latency_ms: 100          # Maximum inference time per window
+  batch_size: 1                # Single window inference (real-time)
+  
+  # Feature expectations
+  feature_dim: 10000           # MiniRocket feature vector size
+  
+  # Safety override behavior
+  safety:
+    rule_engine_override: true  # Final_Risk = MAX(Ensemble, RuleEngine)
+    pessimistic_aggregation: true
+
+# -----------------------------------------------------------------------------
+# Artifact Paths (Relative to project root)
+# -----------------------------------------------------------------------------
+artifacts:
+  model_dir: "models/ensemble_v4"
+  xgboost_path: "models/ensemble_v4/xgboost_calibrated.pkl"
+  random_forest_path: "models/ensemble_v4/random_forest_calibrated.pkl"
+  sgd_path: "models/ensemble_v4/sgd_classifier_calibrated.pkl"
+  scaler_path: "models/ensemble_v4/feature_scaler.pkl"
+  metrics_path: "models/ensemble_v4/cv_metrics.json"
+  config_snapshot_path: "models/ensemble_v4/config_snapshot.yaml"
+
+# -----------------------------------------------------------------------------
+# Logging Configuration
+# -----------------------------------------------------------------------------
+logging:
+  level: "INFO"
+  log_predictions: false       # Set true for audit mode
+  log_patient_ids: true        # Required for reproducibility verification
+  log_fold_details: true
+
+# -----------------------------------------------------------------------------
+# Version Information
+# -----------------------------------------------------------------------------
+version:
+  engine: "4.0.0"
+  config_schema: "1.0"
+  last_trained: null           # Updated by training script
+  git_commit: null             # Updated by training script

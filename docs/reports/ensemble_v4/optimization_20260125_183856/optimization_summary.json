@@ -1,0 +1,52 @@
+{
+  "base_weights": {
+    "xgboost": 0.4,
+    "random_forest": 0.3,
+    "sgd_classifier": 0.3
+  },
+  "best_weights": {
+    "xgboost": 0.0,
+    "random_forest": 0.45,
+    "sgd_classifier": 0.55
+  },
+  "best_threshold_fpr": 0.20267071487245517,
+  "best_recall_fpr": 1.0,
+  "tuned_threshold": 0.010076216521555426,
+  "metrics_base": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "auc": 1.0,
+    "confusion": [
+      [
+        375,
+        0
+      ],
+      [
+        0,
+        105
+      ]
+    ]
+  },
+  "metrics_tuned": {
+    "precision": 0.21875,
+    "recall": 1.0,
+    "f1": 0.358974358974359,
+    "auc": 0.9986539682539682,
+    "confusion": [
+      [
+        0,
+        375
+      ],
+      [
+        0,
+        105
+      ]
+    ],
+    "brier": 0.051900366568939586,
+    "ece": 0.16665465650362923
+  },
+  "cost_of_recall": Infinity,
+  "brier": 0.051900366568939586,
+  "ece": 0.16665465650362923
+}

@@ -5,6 +5,7 @@ interface CategoryBadgeProps {
   category: Category
   size?: 'sm' | 'md' | 'lg'
   showLabel?: boolean
+  confidence?: number // AI confidence score (0-100)
   className?: string
 }
 
@@ -48,6 +49,7 @@ export const CategoryBadge: React.FC<CategoryBadgeProps> = ({
   category, 
   size = 'md',
   showLabel = true,
+  confidence,
   className = '' 
 }) => {
   const config = categoryConfig[category] ?? categoryConfig[1]
@@ -60,7 +62,7 @@ export const CategoryBadge: React.FC<CategoryBadgeProps> = ({
         ${sizeClasses[size]}
         ${className}
       `}
-      title={config.description}
+      title={`${config.description}${confidence ? ` (${confidence}% confidence)` : ''}`}
     >
       {/* Category indicator dot */}
       <span className={`
@@ -70,7 +72,14 @@ export const CategoryBadge: React.FC<CategoryBadgeProps> = ({
         ${category === 3 ? 'bg-red-400 animate-pulse' : ''}
       `} />
       
-      {showLabel && <span>{config.label}</span>}
+      {showLabel && (
+        <span>
+          {config.label}
+          {confidence != null && (
+            <span className="ml-1 opacity-80 text-xs">({confidence}%)</span>
+          )}
+        </span>
+      )}
     </span>
   )
 }

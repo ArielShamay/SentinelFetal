@@ -1,0 +1,14 @@
+ensemble:
+  aggregation_method: soft_voting
+  weights:
+    random_forest: 0.45
+    sgd_classifier: 0.55
+    xgboost: 0.0
+notes:
+  fpr_constraint: 0.15
+  min_precision: 0.15
+  optimized_at: '20260125_183856'
+thresholds:
+  critical: 0.010076216521555426
+  normal: 0.35
+  warning: 0.35

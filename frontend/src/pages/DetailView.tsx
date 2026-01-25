@@ -2,8 +2,10 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePatientStore } from '../stores'
 import { CategoryBadge, CTGChart, ChartControls, TrendPanel, ExplanationPanel } from '../components'
+import { FindingsPanel } from '../components/panels/FindingsPanel'
 import { api } from '../services'
 import type { PatientSnapshot, Alert, WSPatientUpdate } from '../types'
+import { AlertTriangle } from 'lucide-react'
 
 export const DetailView: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>()
@@ -126,20 +128,27 @@ export const DetailView: React.FC = () => {
           ← Back to Ward View
         </button>
         
-        {/* MHR Warning Banner */}
+        {/* MHR Alert Banner */}
         {isMHR && (
-          <div className="mb-4 bg-orange-100 border border-orange-300 text-orange-800 px-4 py-3 rounded-lg flex items-center gap-3">
-            <span className="text-2xl">⚠️</span>
-            <div>
-              <p className="font-bold">MATERNAL PULSE DETECTED</p>
-              <p className="text-sm">
-                Signal may be maternal heart rate – verify sensor placement
-                {liveUpdate?.mhr_alert?.confidence && (
-                  <span className="ml-2 opacity-75">
-                    (Confidence: {Math.round(liveUpdate.mhr_alert.confidence * 100)}%)
-                  </span>
-                )}
-              </p>
+          <div className="bg-purple-900/40 border-2 border-purple-500/70 rounded-lg p-4 mb-4 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-purple-300 animate-pulse" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 text-purple-200 font-semibold text-base">
+                  <Activity className="w-5 h-5" />
+                  <span>Multiple Heart Rate Source Detected</span>
+                </div>
+                <p className="text-purple-300/80 text-sm mt-1">
+                  Maternal and fetal signals may be overlapping. Verify electrode placement.
+                  {liveUpdate?.mhr_alert?.confidence && (
+                    <span className="ml-2 opacity-75">
+                      ({Math.round(liveUpdate.mhr_alert.confidence * 100)}% confidence)
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -158,6 +167,7 @@ export const DetailView: React.FC = () => {
             <CategoryBadge
               category={currentData.category}
               size="lg"
+              confidence={liveUpdate?.confidence ? Math.round(liveUpdate.confidence * 100) : undefined}
             />
           )}
         </div>
@@ -206,6 +216,9 @@ export const DetailView: React.FC = () => {
                 confidence: (currentData.explanation ?? liveUpdate?.explanation)?.confidence ?? 0,
               } : undefined}
             />
+            {liveUpdate?.findings && (
+              <FindingsPanel findings={liveUpdate.findings} />
+            )}
             <EventsPanel alerts={currentData.alerts ?? []} />
             <AlertsPanel patient={currentData} />
           </div>
