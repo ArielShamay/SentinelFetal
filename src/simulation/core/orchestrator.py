@@ -7,14 +7,17 @@ This is the main controller for the real-time CTG simulation, responsible for:
 - Coordinating MOMENT processing with staggered scheduling
 - Handling event injection across patients
 - Thread-safe operation with background simulation loop
+- Pushing processed data to DataBridge for real-time UI updates
 
 Key Design Decisions:
 - Rule Engine runs every tick (fast, ~10ms)
 - MOMENT processing is STAGGERED - one patient every few seconds to prevent CPU freeze
 - Uses threading for background simulation while UI remains responsive
+- DataBridge integration for Pulse Architecture (thread-safe UI updates)
 
 References:
     - SentinelFetal Real-Time Simulator SPEC Part 2, Section 6
+    - SentinelFetal UI Pulse Architecture Blueprint
 """
 
 from __future__ import annotations
@@ -30,6 +33,17 @@ import numpy as np
 from ..generators.patient_generator import PatientGenerator, PatientConfig
 from ..events.event_types import EventType, EventParameters, InjectedEvent
 from ..logging.event_logger import EventLogger
+
+# Import DataBridge for state management integration
+try:
+    from src.interfaces.state_bridge import (
+        get_data_bridge,
+        create_snapshot_from_pipeline_result,
+        PatientSnapshot,
+    )
+    DATA_BRIDGE_AVAILABLE = True
+except ImportError:
+    DATA_BRIDGE_AVAILABLE = False
 
 
 logger = logging.getLogger(__name__)
@@ -342,6 +356,7 @@ class SimulationOrchestrator:
         - Each patient gets MOMENT processing every ~30 seconds
         - Only ONE patient is processed at a time
         - CPU usage is spread out, not spiked
+        - DataBridge is updated for real-time UI (Pulse Architecture)
         """
         if not self._processing_callback:
             return
@@ -368,6 +383,59 @@ class SimulationOrchestrator:
                 patient.latest_category = results.get('category', 1)
                 patient.latest_alert = results.get('alert')
                 patient.latest_findings = results.get('findings', {})
+                
+                # ============================================================
+                # Pulse Architecture: Push to DataBridge (Thread-Safe)
+                # ============================================================
+                if DATA_BRIDGE_AVAILABLE:
+                    try:
+                        bridge = get_data_bridge()
+                        
+                        # Get FHR/UC samples for snapshot
+                        fhr_samples = data.get('fhr', [])
+                        uc_samples = data.get('uc', [])
+                        if hasattr(fhr_samples, 'tolist'):
+                            fhr_samples = fhr_samples.tolist()
+                        if hasattr(uc_samples, 'tolist'):
+                            uc_samples = uc_samples.tolist()
+                        
+                        # Get active events
+                        active_events = [
+                            e.event_type.name 
+                            for e in patient.get_active_events()
+                        ]
+                        
+                        # Create and push snapshot
+                        snapshot = create_snapshot_from_pipeline_result(
+                            patient_id=patient_id,
+                            pipeline_result=results,
+                            fhr_samples=fhr_samples,
+                            uc_samples=uc_samples,
+                            patient_config=patient.config,
+                            active_events=active_events,
+                        )
+                        bridge.push_batch(patient_id, snapshot)
+                        
+                        # Update simulation state in bridge
+                        bridge.update_simulation_state(
+                            simulation_time=self._simulation_time,
+                            is_running=self._running,
+                            is_paused=self._paused,
+                            speed_multiplier=self._speed_multiplier,
+                        )
+                        
+                        # Push alert if Category 2 or 3
+                        if results.get('category', 1) >= 2:
+                            bridge.push_alert({
+                                'patient_id': patient_id,
+                                'category': results.get('category'),
+                                'confidence': results.get('confidence', 0.0),
+                                'simulation_time': self._simulation_time,
+                                'findings': results.get('findings', {}),
+                            })
+                            
+                    except Exception as e:
+                        logger.debug(f"DataBridge push failed (non-critical): {e}")
                 
                 # Log Category 2/3 alerts
                 if results.get('category', 1) >= 2:
@@ -531,6 +599,14 @@ class SimulationOrchestrator:
             self._tick_count = 0
             self._moment_process_count = 0
             self._logger.clear()
+            
+            # Clear DataBridge for Pulse Architecture
+            if DATA_BRIDGE_AVAILABLE:
+                try:
+                    bridge = get_data_bridge()
+                    bridge.clear_all()
+                except Exception as e:
+                    logger.debug(f"DataBridge clear failed (non-critical): {e}")
         
         logger.info("All patients reset")
     

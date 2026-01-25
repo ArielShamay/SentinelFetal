@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSimulation } from '../../hooks'
 import { usePatientStore } from '../../stores'
@@ -8,26 +8,46 @@ interface SimulationControlsProps {
   compact?: boolean
 }
 
-export const SimulationControls: React.FC<SimulationControlsProps> = ({ 
+export const SimulationControls: React.FC<SimulationControlsProps> = ({
   className = '',
-  compact = false 
+  compact = false
 }) => {
   const { t } = useTranslation()
-  const { 
+  const {
     loading,
     start,
     stop,
     pause,
     resume,
-    reset
+    reset,
+    setPatientCount: updatePatientCount
   } = useSimulation()
-  
+
   const simulationRunning = usePatientStore(state => state.simulationRunning)
   const simulationPaused = usePatientStore(state => state.simulationPaused)
-  
+  const currentPatientCount = usePatientStore(state => state.patientCount)
+
+  const [patientCount, setLocalPatientCount] = useState(currentPatientCount || 10)
+
   const isRunning = simulationRunning && !simulationPaused
   const isPaused = simulationRunning && simulationPaused
   const isStopped = !simulationRunning
+
+  // Handle patient count change
+  const handlePatientCountChange = useCallback(async (newCount: number) => {
+    setLocalPatientCount(newCount)
+    // Only update backend if simulation is not running
+    if (isStopped) {
+      await updatePatientCount(newCount)
+    }
+  }, [isStopped, updatePatientCount])
+
+  // Start simulation with selected patient count
+  const handleStart = useCallback(async () => {
+    // First set the patient count, then start
+    await updatePatientCount(patientCount)
+    await start()
+  }, [patientCount, updatePatientCount, start])
   
   const buttonBase = compact 
     ? 'px-2 py-1 text-xs rounded'
@@ -37,10 +57,30 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
   
   return (
     <div className={`flex items-center gap-2 ${className}`}>
+      {/* Patient Count Selector - only show when stopped and not compact */}
+      {isStopped && !compact && (
+        <div className="flex items-center gap-2 bg-gray-800 rounded-md px-3 py-1.5">
+          <label className="text-xs text-gray-400 whitespace-nowrap">
+            Patients:
+          </label>
+          <input
+            type="range"
+            min="1"
+            max="20"
+            value={patientCount}
+            onChange={(e) => handlePatientCountChange(parseInt(e.target.value))}
+            className="w-20 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+          />
+          <span className="text-sm font-medium text-white w-6 text-center">
+            {patientCount}
+          </span>
+        </div>
+      )}
+
       {/* Start/Resume Button */}
       {(isStopped || isPaused) && (
         <button
-          onClick={() => isPaused ? resume() : start()}
+          onClick={() => isPaused ? resume() : handleStart()}
           disabled={loading}
           className={`${buttonBase} bg-green-600 hover:bg-green-700 text-white font-medium transition-colors ${
             loading ? disabledClass : ''

@@ -476,24 +476,36 @@ class FHRGenerator:
         event: InjectedEvent
     ) -> np.ndarray:
         """
-        Apply sinusoidal pattern.
-        
-        Replaces normal variability with smooth sine wave oscillation.
+        Apply sinusoidal pattern with realistic physiological noise.
+
+        Replaces normal variability with smooth sine wave oscillation
+        plus small physiological noise for clinical realism.
         SEVERE finding - always Category 3.
+
+        Clinical Note:
+            Real sinusoidal patterns are never mathematically perfect.
+            Small beat-to-beat variations (1-2 bpm) are always present
+            due to residual autonomic activity.
         """
         params: SinusoidalParams = event.params
         event_mask = (times >= event.start_time) & (times <= event.end_time)
-        
+
         if not np.any(event_mask):
             return fhr
-        
+
         t_rel = times[event_mask] - event.start_time
         freq = params.frequency_cycles_per_min / 60.0  # Convert to Hz
-        
-        # Pure sinusoidal pattern replaces normal FHR
+
+        # Sinusoidal pattern with realistic physiological noise
         sinusoidal = np.sin(2 * np.pi * freq * t_rel) * params.amplitude_bpm
-        fhr[event_mask] = self.config.baseline_fhr + sinusoidal
-        
+
+        # Add small physiological noise (1-2 bpm standard deviation)
+        # This makes the pattern look clinically realistic while
+        # preserving the characteristic smooth oscillation
+        noise = np.random.normal(0, 1.5, len(t_rel))
+
+        fhr[event_mask] = self.config.baseline_fhr + sinusoidal + noise
+
         return fhr
     
     def reset(self) -> None:

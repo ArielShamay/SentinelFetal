@@ -44,10 +44,12 @@ env/
 htmlcov/
 *.cover
 
-# Data (large files)
-data/ctu-chb-intrapartum-cardiotocography-database-1.0.0/ctu-chb-intrapartum-cardiotocography-database-1.0.0/*.dat
-data/ctu-chb-intrapartum-cardiotocography-database-1.0.0/ctu-chb-intrapartum-cardiotocography-database-1.0.0/*.qrs
+# Data (large files) - DO NOT commit medical datasets
+data/
 *.pkl
+
+# Archive (old code/docs)
+archive/
 
 # Windows special files
 nul

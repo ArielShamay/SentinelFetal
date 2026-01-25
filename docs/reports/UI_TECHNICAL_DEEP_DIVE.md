@@ -1,24 +1,36 @@
 # SentinelFetal UI Technical Deep-Dive
 
-> **Document Purpose:** Brutally honest technical documentation for optimization AI agents.  
-> **Version:** 1.0 - Post-Cleanup Assessment  
-> **Date:** 2025-01-XX  
-> **Status:** CRITICAL - Current UI is severely degraded from full-featured version
+> **Document Purpose:** Brutally honest technical documentation for optimization AI agents.
+> **Version:** 2.0 - Post-Forensic-Audit Assessment
+> **Date:** January 23, 2026
+> **Status:** CRITICAL - Both dashboards have significant issues
+
+---
+
+> **UPDATE (January 23, 2026):** This document is partially outdated. For current UI status,
+> see [UI_UX_GAP_ANALYSIS.md](UI_UX_GAP_ANALYSIS.md) which contains a forensic audit with
+> specific line numbers for all bugs.
 
 ---
 
 ## Executive Summary
 
-The current `src/ui/app.py` (315 lines) is a **stripped-down, non-functional prototype** that was created during crash-recovery to demonstrate basic Streamlit mechanics. It has **ZERO backend integration** and generates purely synthetic FHR data with no connection to the actual SentinelFetal processing pipeline.
+**Current Status:** Both UI dashboards (`app.py` and `simulation_app.py`) have backend integration but suffer from critical display bugs that prevent users from seeing backend results correctly.
 
-A **full-featured version exists** at `src/ui/simulation_app.py` (801 lines) that includes:
-- SimulationOrchestrator integration
-- PipelineAdapter for real CTG processing
-- MOMENT AI encoder integration
-- Rule-based alert detection
-- Staggered rendering for performance
+| Dashboard | Lines | Backend Integration | Critical Issues |
+|-----------|-------|---------------------|-----------------|
+| `app.py` | ~958 | Yes (PipelineAdapter) | Full-page rerun, broken HTML, data truncation |
+| `simulation_app.py` | ~800 | Yes (PipelineAdapter) | Stale category display, V2.0 features hidden |
 
-**CRITICAL:** The current app.py must be considered a throwaway placeholder. Any optimization work should start from `simulation_app.py` as the baseline.
+**Recommended Dashboard:** Use `simulation_app.py` — it has fewer issues and uses proper `@st.fragment` for partial updates.
+
+**Key Problem:** Both dashboards receive correct data from the backend (V2.0 modules are working), but the UI layer has bugs that:
+1. Display stale category values (closure capture bug)
+2. Ignore V2.0 fields (`mhr_alert`, `trend`, `explanation`)
+3. Don't pass deceleration data to the chart (no red zones)
+4. Truncate historical data (can't scroll timeline)
+
+See [UI_UX_GAP_ANALYSIS.md](UI_UX_GAP_ANALYSIS.md) for full forensic audit with line numbers.
 
 ---
 

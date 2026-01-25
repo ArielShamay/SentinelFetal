@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+  #!/usr/bin/env python3
 """
 Clinical Validation Suite - Accuracy & Safety Testing
 ======================================================
@@ -70,7 +70,8 @@ from tqdm import tqdm
 SAMPLING_RATE = 4.0
 WARMUP_MINUTES = 20.0
 ANALYSIS_WINDOW_SECONDS = 600  # 10 minutes
-ITERATIONS_PER_SCENARIO = 30  # Number of test cases per archetype
+ITERATIONS_PER_SCENARIO = 30  # Number of test cases per archetype (default)
+MASSIVE_ITERATIONS = 2000  # Per scenario for --massive mode (total 10,000)
 
 
 class ExpectedOutcome(Enum):
@@ -788,6 +789,26 @@ def generate_report(all_stats: Dict[str, ScenarioStats], all_results: Dict[str, 
 # ============================================================================
 
 def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Clinical Validation Suite')
+    parser.add_argument('--massive', action='store_true', 
+                        help='Run 10,000 iterations (massive test)')
+    parser.add_argument('--iterations', type=int, default=None,
+                        help='Override iterations per scenario')
+    args = parser.parse_args()
+    
+    # Determine iteration count
+    if args.iterations is not None:
+        iterations = args.iterations
+    elif args.massive:
+        iterations = MASSIVE_ITERATIONS
+        print("=" * 60)
+        print("🔴 MASSIVE TEST MODE: 10,000 iterations")
+        print("=" * 60)
+    else:
+        iterations = ITERATIONS_PER_SCENARIO
+    
     print("Clinical Validation Suite - Starting...")
     print("=" * 60)
 
@@ -804,7 +825,7 @@ def main():
         sys.exit(1)
 
     print(f"Engine: MiniRocket ready")
-    print(f"Iterations per scenario: {ITERATIONS_PER_SCENARIO}")
+    print(f"Iterations per scenario: {iterations}")
     print()
 
     # Define scenarios
@@ -816,7 +837,7 @@ def main():
         ("Heavy Noise", generate_heavy_noise),
     ]
 
-    total_tests = len(scenarios) * ITERATIONS_PER_SCENARIO
+    total_tests = len(scenarios) * iterations
 
     all_results: Dict[str, List[TestResult]] = {}
     all_stats: Dict[str, ScenarioStats] = {}
@@ -825,7 +846,7 @@ def main():
     with tqdm(total=total_tests, desc="Clinical Validation", unit="test", ncols=80) as pbar:
         for scenario_name, generator_func in scenarios:
             # Run tests
-            results = run_scenario_batch(adapter, generator_func, ITERATIONS_PER_SCENARIO, pbar)
+            results = run_scenario_batch(adapter, generator_func, iterations, pbar)
             all_results[scenario_name] = results
 
             # Validate (watchdog)

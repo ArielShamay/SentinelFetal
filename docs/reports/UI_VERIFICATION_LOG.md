@@ -1,11 +1,21 @@
 # SentinelFetal V4 UI Verification Log
 
+> **STATUS: NOT EXECUTED**
+> This verification template was created but never filled in with actual test results.
+> For current UI status, see [STATUS.md](../STATUS.md) and [UI_UX_GAP_ANALYSIS.md](UI_UX_GAP_ANALYSIS.md).
+>
+> **Known Critical Issues (as of January 23, 2026):**
+> - Ghost Alerts: Category display uses stale values
+> - V2.0 UI components (MHR, Trend, Explanation): NOT IMPLEMENTED
+> - Graph highlighting (red zones): NOT WIRED
+> - Timeline scrolling: Data truncated before chart
+
 ## Test Information
 
 | Field | Value |
 |-------|-------|
-| Test Date | [DATE] |
-| Tester | [NAME] |
+| Test Date | NOT TESTED |
+| Tester | N/A |
 | Version | V4.0 |
 | Branch | main |
 

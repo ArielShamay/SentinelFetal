@@ -1,24 +1,53 @@
 import React, { useMemo } from 'react'
 import { usePatientStore, useUIStore } from '../stores'
 import { PatientCard, getCategoryPriority } from '../components'
-import type { Category } from '../types'
+import type { Category, PatientSnapshot, WSPatientUpdate } from '../types'
+import { CATEGORY_NAMES } from '../types'
 
 type SortMode = 'id' | 'category' | 'fhr' | 'time'
 type FilterMode = 'all' | Category
 
+// Convert WSPatientUpdate to PatientSnapshot-like object for display
+const wsUpdateToSnapshot = (update: WSPatientUpdate): PatientSnapshot => {
+  const currentFhr = update.fhr_latest[update.fhr_latest.length - 1] ?? update.baseline
+  const currentUc = update.uc_latest[update.uc_latest.length - 1] ?? 0
+
+  return {
+    patient_id: update.patient_id,
+    bed_number: parseInt(update.patient_id.replace(/\D/g, '')) || 0,
+    category: update.category,
+    category_name: CATEGORY_NAMES[update.category] || 'Unknown',
+    metrics: {
+      baseline_fhr: update.baseline,
+      current_fhr: currentFhr,
+      variability: update.variability,
+      current_uc: currentUc,
+    },
+    fhr_history: update.fhr_latest,
+    uc_history: update.uc_latest,
+    timestamps: [],
+    alerts: [],
+    trend_data: null,
+    explanation: null,
+    fsqi_score: update.fsqi,
+    has_active_event: false,
+    last_update: Date.now(),
+  }
+}
+
 export const WardView: React.FC = () => {
-  const patients = usePatientStore(state => state.patients)
   const liveUpdates = usePatientStore(state => state.liveUpdates)
   const gridColumns = useUIStore(state => state.gridColumns)
   const setGridColumns = useUIStore(state => state.setGridColumns)
-  
+
   const [sortMode, setSortMode] = React.useState<SortMode>('category')
   const [filterMode, setFilterMode] = React.useState<FilterMode>('all')
   const [searchQuery, setSearchQuery] = React.useState('')
-  
-  // Convert Map to array and apply sorting/filtering
+
+  // Convert WSPatientUpdate Map to PatientSnapshot array and apply sorting/filtering
   const sortedPatients = useMemo(() => {
-    let patientArray = Array.from(patients.values())
+    // Convert live updates to patient snapshots
+    let patientArray = Array.from(liveUpdates.values()).map(wsUpdateToSnapshot)
     
     // Apply filter
     if (filterMode !== 'all') {
@@ -57,17 +86,17 @@ export const WardView: React.FC = () => {
     }
     
     return patientArray
-  }, [patients, sortMode, filterMode, searchQuery])
-  
+  }, [liveUpdates, sortMode, filterMode, searchQuery])
+
   // Category counts for filter badges
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: patients.size }
-    for (const patient of patients.values()) {
-      const cat = patient.category
+    const counts: Record<string, number> = { all: liveUpdates.size }
+    for (const update of liveUpdates.values()) {
+      const cat = update.category
       counts[cat] = (counts[cat] ?? 0) + 1
     }
     return counts
-  }, [patients])
+  }, [liveUpdates])
   
   const gridClass: Record<number, string> = {
     2: 'grid-cols-1 md:grid-cols-2',

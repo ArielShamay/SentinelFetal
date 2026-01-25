@@ -1,16 +1,16 @@
 # Clinical Validation Report
 
-**Date:** 2026-01-21T10:29:05.085709Z
+**Date:** 2026-01-23T12:28:33.257814Z
 **Iterations per scenario:** 30
 
 ---
 
 ## Executive Summary
 
-- **Overall Accuracy:** 98.7%
+- **Overall Accuracy:** 98.1%
 - **Specificity (Healthy → Cat I):** 100.0%
-- **Sensitivity (Late Decel → Cat II/III):** 93.3%
-- **Noise Immunity (FSQI Rejection):** 100.0%
+- **Sensitivity (Late Decel → Cat II/III):** 91.1%
+- **Noise Immunity (FSQI Rejection):** 99.8%
 
 ---
 
@@ -18,11 +18,11 @@
 
 | Scenario | N | Expected | Pred Cat I | Pred Cat II | Pred Cat III | Rejected | Accuracy |
 |----------|---|----------|------------|-------------|--------------|----------|----------|
-| Textbook Healthy | 30 | Cat I | 30 | 0 | 0 | 0 | 100.0% |
-| Late Deceleration | 30 | Cat II/III | 2 | 28 | 0 | 0 | 93.3% |
-| Variable Deceleration | 30 | Variable Decel | 30 | 0 | 0 | 0 | 100.0% |
-| Sinusoidal Pattern | 30 | Sinusoidal | 0 | 0 | 30 | 0 | 100.0% |
-| Heavy Noise | 30 | Rejected | 0 | 0 | 0 | 30 | 100.0% |
+| Textbook Healthy | 2000 | Cat I | 2000 | 0 | 0 | 0 | 100.0% |
+| Late Deceleration | 2000 | Cat II/III | 178 | 1822 | 0 | 0 | 91.1% |
+| Variable Deceleration | 2000 | Variable Decel | 1985 | 15 | 0 | 0 | 100.0% |
+| Sinusoidal Pattern | 2000 | Sinusoidal | 4 | 0 | 1996 | 0 | 99.8% |
+| Heavy Noise | 2000 | Rejected | 5 | 0 | 0 | 1995 | 99.8% |
 
 ---
 
@@ -30,37 +30,37 @@
 
 ### Textbook Healthy
 
-- **Tests:** 30
-- **Correct:** 30 (100.0%)
-- **Avg FSQI:** 0.976
+- **Tests:** 2000
+- **Correct:** 2000 (100.0%)
+- **Avg FSQI:** 0.983
 
 ### Late Deceleration
 
-- **Tests:** 30
-- **Correct:** 28 (93.3%)
-- **Avg FSQI:** 0.944
-- **Decelerations:** Late=91, Variable=3
+- **Tests:** 2000
+- **Correct:** 1822 (91.1%)
+- **Avg FSQI:** 0.946
+- **Decelerations:** Late=5940, Variable=222
 
 ### Variable Deceleration
 
-- **Tests:** 30
-- **Correct:** 30 (100.0%)
+- **Tests:** 2000
+- **Correct:** 2000 (100.0%)
 - **Avg FSQI:** 1.000
-- **Decelerations:** Late=7, Variable=113
-- **Detection Rate:** 113 Variable decels detected across 30 tests
+- **Decelerations:** Late=747, Variable=7253
+- **Detection Rate:** 7253 Variable decels detected across 2000 tests
 - **Note:** ML classifier outputs Cat I; decelerations correctly typed as Variable
 
 ### Sinusoidal Pattern
 
-- **Tests:** 30
-- **Correct:** 30 (100.0%)
+- **Tests:** 2000
+- **Correct:** 1996 (99.8%)
 - **Avg FSQI:** 1.000
 - **Note:** Sinusoidal detection requires specific detector training
 
 ### Heavy Noise
 
-- **Tests:** 30
-- **Correct:** 30 (100.0%)
+- **Tests:** 2000
+- **Correct:** 1995 (99.8%)
 - **Avg FSQI:** 0.300
 
 ---
