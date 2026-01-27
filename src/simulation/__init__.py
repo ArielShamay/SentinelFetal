@@ -13,11 +13,10 @@ Sub-packages:
 Example:
     >>> from src.simulation import (
     ...     SimulationOrchestrator, OrchestratorConfig,
-    ...     PipelineAdapter, EventType, SinusoidalParams
+    ...     EventType, SinusoidalParams
     ... )
-    >>> adapter = PipelineAdapter()  # Uses real MOMENT model
     >>> orchestrator = SimulationOrchestrator(
-    ...     processing_callback=lambda pid, data: adapter.process_patient(pid, data)
+    ...     processing_callback=lambda pid, data: data
     ... )
     >>> orchestrator.start()
 """
@@ -48,7 +47,7 @@ from .events.event_types import (
     TachysystoleParams,
 )
 
-# Processing
+# Processing (V6 Pre-AI compatibility adapter)
 from .processing.pipeline_adapter import PipelineAdapter, PipelineAdapterConfig
 
 # Logging
@@ -80,7 +79,7 @@ __all__ = [
     'VariabilityParams',
     'SinusoidalParams',
     'TachysystoleParams',
-    
+
     # Processing
     'PipelineAdapter',
     'PipelineAdapterConfig',

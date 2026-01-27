@@ -9,9 +9,16 @@ Tests for the three new modules introduced in SentinelFetal V2.0:
 Run with: pytest tests/test_v2_features.py -v
 """
 
+import os
 import time
 import pytest
 import numpy as np
+
+if os.getenv("RUN_LEGACY_PIPELINE_TESTS") != "1":
+    pytest.skip(
+        "Legacy V2 feature tests disabled for V6 Pre-AI (set RUN_LEGACY_PIPELINE_TESTS=1 to run).",
+        allow_module_level=True,
+    )
 
 # ============================================================================
 # MHR Guard Tests

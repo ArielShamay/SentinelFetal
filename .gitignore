@@ -23,6 +23,7 @@ wheels/
 # Virtual Environment
 venv/
 .venv/
+.venv311/
 ENV/
 env/
 .env
@@ -64,6 +65,10 @@ models/*.ckpt
 # Logs
 *.log
 logs/
+
+# Local reports / bundles
+REPORTS/
+training_pack_v6*.zip
 
 # Claude
 .claude/

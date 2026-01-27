@@ -11,10 +11,14 @@ from typing import Dict, List, Tuple
 import numpy as np
 import yaml
 
+from src.utils.runtime_config import load_runtime_config
+
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 VAL_DEFAULT = PROJECT_ROOT / "models" / "ensemble_v5" / "validation_preds_v5.csv"
 ENSEMBLE_CFG_DEFAULT = PROJECT_ROOT / "config" / "ensemble_v5_optuna.yaml"
 OUT_PATH = PROJECT_ROOT / "config" / "smart_logic_v5_thresholds.yaml"
+RUNTIME_CFG_PATH = PROJECT_ROOT / "config" / "runtime.yaml"
+RUNTIME_CFG = load_runtime_config(RUNTIME_CFG_PATH)
 
 
 @dataclass
@@ -174,7 +178,7 @@ if __name__ == "__main__":
     parser.add_argument("--t_step", type=float, default=0.01)
     parser.add_argument("--k", type=int, default=2)
     parser.add_argument("--n", type=int, default=3)
-    parser.add_argument("--persistence_window_minutes", type=int, default=15)
+    parser.add_argument("--persistence_window_minutes", type=int, default=int(RUNTIME_CFG.window_minutes))
     parser.add_argument("--recall_guardrail", type=float, default=0.85)
     parser.add_argument("--alert_penalty", type=float, default=0.5)
     parser.add_argument("--ensemble_threshold", type=float, default=0.3844)

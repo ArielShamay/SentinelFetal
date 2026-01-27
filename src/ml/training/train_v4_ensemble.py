@@ -82,6 +82,8 @@ CONFIG_PATH = PROJECT_ROOT / "config" / "ensemble_v4.yaml"
 DATA_DIR = PROJECT_ROOT / "data" / "ctu-chb-intrapartum-cardiotocography-database-1.0.0" / "ctu-chb-intrapartum-cardiotocography-database-1.0.0"
 OUTPUT_DIR = PROJECT_ROOT / "models" / "ensemble_v4"
 REPORTS_DIR = PROJECT_ROOT / "docs" / "reports"
+LOG_DIR = PROJECT_ROOT / "REPORTS" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Configure logging
 logging.basicConfig(
@@ -89,7 +91,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(OUTPUT_DIR / "training.log" if OUTPUT_DIR.exists() else "training.log")
+        logging.FileHandler(LOG_DIR / "training.log"),
     ]
 )
 logger = logging.getLogger(__name__)

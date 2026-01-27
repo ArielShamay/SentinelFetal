@@ -28,7 +28,8 @@ from typing import Optional
 
 import numpy as np
 
-from src.analysis.fallback_audit import record_fallback
+from src.analysis.fallback_audit import record_fallback, get_case_context
+from src.utils.runtime_config import load_runtime_config
 
 from src.config import THRESHOLDS
 
@@ -135,20 +136,30 @@ def calculate_baseline(
             stats.update(extra)
         return stats
     
+    runtime_cfg = load_runtime_config()
+
     # Calculate window parameters
     window_samples = int(window_minutes * 60 * sampling_rate)  # e.g., 2 min * 60 * 4 = 480
     step_samples = int(step_seconds * sampling_rate)  # e.g., 10 * 4 = 40
+
+    def _raise_strict_fallback(reason: str, stats: dict) -> None:
+        case_id = get_case_context()
+        case_tag = case_id if case_id is not None else "unknown"
+        raise RuntimeError(
+            "STRICT_MODE baseline fallback | "
+            f"case_id={case_tag} reason={reason} "
+            f"window_minutes={window_minutes} sampling_rate={sampling_rate} stats={stats}"
+        )
     
     # Check if signal is long enough
     if len(fhr) < window_samples:
+        stats = _fallback_stats("window_too_short", {"window_minutes": window_minutes})
+        record_fallback("baseline", "too_short", stats)
+        if runtime_cfg.strict_mode:
+            _raise_strict_fallback("window_too_short", stats)
         logger.warning(
             f"Signal too short ({len(fhr)} samples) for {window_minutes}-minute window. "
             "Using global mean as fallback."
-        )
-        record_fallback(
-            "baseline",
-            "too_short",
-            _fallback_stats("window_too_short", {"window_minutes": window_minutes}),
         )
         return _calculate_fallback_baseline(fhr)
     
@@ -184,14 +195,13 @@ def calculate_baseline(
     
     # If no stable segment found, use fallback
     if best_baseline is None:
+        stats = _fallback_stats("no_stable_segment", {"variability_threshold": variability_threshold})
+        record_fallback("baseline", "no_stable_segment", stats)
+        if runtime_cfg.strict_mode:
+            _raise_strict_fallback("no_stable_segment", stats)
         logger.warning(
             f"No stable segment found (variability < {variability_threshold}). "
             "Using global mean as fallback."
-        )
-        record_fallback(
-            "baseline",
-            "no_stable_segment",
-            _fallback_stats("no_stable_segment", {"variability_threshold": variability_threshold}),
         )
         return _calculate_fallback_baseline(fhr)
     

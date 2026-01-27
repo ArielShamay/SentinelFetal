@@ -1,38 +1,27 @@
-"""Fallback audit utilities for gauntlet runs."""
+"""Fallback audit utilities (re-exported)."""
 
 from __future__ import annotations
 
-from contextvars import ContextVar
-from typing import Dict, List, Optional
+from src.analysis.fallback_audit import (  # noqa: F401
+    get_case_context,
+    get_fallback_records,
+    get_window_context,
+    raise_if_any_fallback,
+    record_fallback,
+    reset_fallback_audit,
+    set_case_context,
+    set_window_context,
+    write_fallback_audit,
+)
 
-import pandas as pd
-
-_CASE_ID: ContextVar[Optional[str]] = ContextVar("case_id", default=None)
-_FALLBACKS: List[Dict] = []
-
-
-def set_case_context(case_id: Optional[str]) -> None:
-    _CASE_ID.set(case_id)
-
-
-def reset_fallback_audit() -> None:
-    _FALLBACKS.clear()
-
-
-def record_fallback(module: str, reason: str, stats: Dict) -> None:
-    _FALLBACKS.append({
-        "case_id": _CASE_ID.get(),
-        "module": module,
-        "reason": reason,
-        **stats,
-    })
-
-
-def get_fallback_records() -> List[Dict]:
-    return list(_FALLBACKS)
-
-
-def write_fallback_audit(path) -> None:
-    df = pd.DataFrame(_FALLBACKS)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(path, index=False)
+__all__ = [
+    "get_case_context",
+    "get_fallback_records",
+    "get_window_context",
+    "raise_if_any_fallback",
+    "record_fallback",
+    "reset_fallback_audit",
+    "set_case_context",
+    "set_window_context",
+    "write_fallback_audit",
+]

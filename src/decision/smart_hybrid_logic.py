@@ -20,6 +20,9 @@ import yaml
 
 from src.config import CTG
 from src.signal_invariants import assert_signal_length
+from src.utils.runtime_config import load_runtime_config
+
+RUNTIME_CFG = load_runtime_config()
 
 
 @dataclass
@@ -148,9 +151,9 @@ def compute_signal_quality(
     When return_metrics=True, a diagnostics dict is returned instead of the tuple.
     """
 
-    assert_signal_length(raw_fhr_window, fs, 20, "QUALITY:RAW_FHR")
+    assert_signal_length(raw_fhr_window, fs, RUNTIME_CFG.min_window_minutes, "QUALITY:RAW_FHR")
     if raw_uc_window is not None:
-        assert_signal_length(raw_uc_window, fs, 20, "QUALITY:RAW_UC")
+        assert_signal_length(raw_uc_window, fs, RUNTIME_CFG.min_window_minutes, "QUALITY:RAW_UC")
 
     window = np.asarray(raw_fhr_window, dtype=float)
     if window.size == 0:

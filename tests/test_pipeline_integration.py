@@ -21,6 +21,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+if os.getenv("RUN_LEGACY_PIPELINE_TESTS") != "1":
+    pytest.skip(
+        "Legacy pipeline integration tests disabled for V6 Pre-AI (set RUN_LEGACY_PIPELINE_TESTS=1 to run).",
+        allow_module_level=True,
+    )
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

@@ -38,6 +38,8 @@ from typing import Optional
 import numpy as np
 from scipy.fft import fft, fftfreq
 
+from src.analysis.fallback_audit import record_fallback, get_case_context
+from src.utils.runtime_config import load_runtime_config
 # Configure module logger
 logger = logging.getLogger(__name__)
 
@@ -134,6 +136,32 @@ def detect_sinusoidal_pattern(
     # Validate input
     if fhr is None or len(fhr) == 0:
         raise SinusoidalDetectionError("Input FHR signal is empty or None")
+
+    runtime_cfg = load_runtime_config()
+
+    def _fallback_stats(reason: str, extra: Optional[dict] = None) -> dict:
+        arr = np.asarray(fhr, dtype=float)
+        n = len(arr)
+        duration_min = n / sampling_rate / 60.0 if sampling_rate else float("inf")
+        nan_frac = float(np.mean(np.isnan(arr))) if n else 1.0
+        stats = {
+            "n_samples": n,
+            "duration_min": duration_min,
+            "nan_frac": nan_frac,
+            "reason_detail": reason,
+        }
+        if extra:
+            stats.update(extra)
+        return stats
+
+    def _raise_strict_fallback(reason: str, stats: dict) -> None:
+        case_id = get_case_context()
+        case_tag = case_id if case_id is not None else "unknown"
+        raise RuntimeError(
+            "STRICT_MODE sinusoidal fallback | "
+            f"case_id={case_tag} reason={reason} "
+            f"min_duration_minutes={min_duration_minutes} sampling_rate={sampling_rate} stats={stats}"
+        )
     
     # Calculate minimum required samples
     min_samples = int(min_duration_minutes * 60 * sampling_rate)  # 20 * 60 * 4 = 4800
@@ -145,6 +173,10 @@ def detect_sinusoidal_pattern(
     # Check signal length
     if len(fhr) < min_samples:
         actual_duration = len(fhr) / sampling_rate / 60
+        stats = _fallback_stats("window_too_short", {"min_duration_minutes": min_duration_minutes})
+        record_fallback("sinusoidal", "too_short", stats)
+        if runtime_cfg.strict_mode:
+            _raise_strict_fallback("window_too_short", stats)
         logger.warning(
             f"Signal too short ({actual_duration:.1f} min) for sinusoidal detection "
             f"(requires {min_duration_minutes} min)"
@@ -158,6 +190,10 @@ def detect_sinusoidal_pattern(
     # Handle NaN values - replace with mean (FFT doesn't handle NaN)
     valid_values = segment[~np.isnan(segment)]
     if len(valid_values) < min_samples * 0.5:
+        stats = _fallback_stats("too_many_nans", {"min_duration_minutes": min_duration_minutes})
+        record_fallback("sinusoidal", "too_many_nans", stats)
+        if runtime_cfg.strict_mode:
+            _raise_strict_fallback("too_many_nans", stats)
         logger.warning("Too many NaN values for reliable sinusoidal detection")
         return _create_not_detected_result(actual_duration, confidence=0.2)
     
@@ -187,6 +223,10 @@ def detect_sinusoidal_pattern(
     target_mask = (xf_positive >= freq_min_hz) & (xf_positive <= freq_max_hz)
     
     if not np.any(target_mask):
+        stats = _fallback_stats("no_frequency_bins", {"min_duration_minutes": min_duration_minutes})
+        record_fallback("sinusoidal", "no_frequency_bins", stats)
+        if runtime_cfg.strict_mode:
+            _raise_strict_fallback("no_frequency_bins", stats)
         logger.warning("No frequency bins in target range")
         return _create_not_detected_result(actual_duration)
     

@@ -23,12 +23,17 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.decision.smart_hybrid_logic import SmartLogicConfig, evaluate, load_threshold_config, persistence_alert
+from src.utils.runtime_config import load_runtime_config, apply_strict_warnings
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 VAL_PATH = PROJECT_ROOT / "models" / "ensemble_v5" / "validation_preds_v5.csv"
 CONFIG_PATH = PROJECT_ROOT / "config" / "ensemble_v5_optuna.yaml"
 LOGIC_CONFIG_PATH = PROJECT_ROOT / "config" / "logic_v5_2.yaml"
 SMART_CFG_PATH = PROJECT_ROOT / "config" / "smart_logic_v5_thresholds.yaml"
+RUNTIME_CFG = load_runtime_config()
+SAFE_WARNING_ALLOWLIST = [
+    # Add allowlisted warnings here if they are proven safe.
+]
 
 
 def load_config(path: Path) -> Tuple[float, Tuple[float, float, float]]:
@@ -128,16 +133,25 @@ def parse_args():
 
 
 def main(args):
+    apply_strict_warnings(RUNTIME_CFG.strict_mode, SAFE_WARNING_ALLOWLIST)
+    print(f"STRICT_MODE: {RUNTIME_CFG.strict_mode}")
+    print(f"Min window minutes: {RUNTIME_CFG.min_window_minutes}")
     if not args.val.exists():
         raise FileNotFoundError(f"Missing validation file: {args.val}")
     thr, weights = load_config(args.config)
     pids, labels, data = load_patient_windows(args.val)
 
+    window_minutes = None
     if args.use_config and args.use_config.exists():
-        cfg, k, n, _ = load_threshold_config(args.use_config)
+        cfg, k, n, window_minutes = load_threshold_config(args.use_config)
     else:
         cfg = calibrate_thresholds(args.val, thr, weights)
         k, n = 2, 3
+    if window_minutes is not None and window_minutes < RUNTIME_CFG.min_window_minutes:
+        raise RuntimeError(
+            "STRICT_WINDOWING: persistence_window_minutes "
+            f"{window_minutes} < min_window_minutes {RUNTIME_CFG.min_window_minutes}"
+        )
 
     if args.t_high is not None:
         cfg.t_high = args.t_high

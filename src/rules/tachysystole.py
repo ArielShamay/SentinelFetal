@@ -26,6 +26,8 @@ from typing import Optional
 import numpy as np
 from scipy.signal import find_peaks
 
+from src.analysis.fallback_audit import record_fallback, get_case_context
+from src.utils.runtime_config import load_runtime_config
 # Configure module logger
 logger = logging.getLogger(__name__)
 
@@ -101,6 +103,32 @@ def detect_tachysystole(
     # Validate input
     if uc is None or len(uc) == 0:
         raise TachysystoleDetectionError("Input UC signal is empty or None")
+
+    runtime_cfg = load_runtime_config()
+
+    def _fallback_stats(reason: str, extra: Optional[dict] = None) -> dict:
+        arr = np.asarray(uc, dtype=float)
+        n = len(arr)
+        duration_min = n / sampling_rate / 60.0 if sampling_rate else float("inf")
+        nan_frac = float(np.mean(np.isnan(arr))) if n else 1.0
+        stats = {
+            "n_samples": n,
+            "duration_min": duration_min,
+            "nan_frac": nan_frac,
+            "reason_detail": reason,
+        }
+        if extra:
+            stats.update(extra)
+        return stats
+
+    def _raise_strict_fallback(reason: str, stats: dict) -> None:
+        case_id = get_case_context()
+        case_tag = case_id if case_id is not None else "unknown"
+        raise RuntimeError(
+            "STRICT_MODE tachysystole fallback | "
+            f"case_id={case_tag} reason={reason} "
+            f"analysis_window_minutes={analysis_window_minutes} sampling_rate={sampling_rate} stats={stats}"
+        )
     
     # Calculate window parameters
     window_samples = int(analysis_window_minutes * 60 * sampling_rate)
@@ -111,6 +139,10 @@ def detect_tachysystole(
         # Use entire signal if shorter than window
         analysis_window = uc.copy()
         actual_duration_minutes = len(uc) / sampling_rate / 60
+        stats = _fallback_stats("window_too_short", {"analysis_window_minutes": analysis_window_minutes})
+        record_fallback("tachysystole", "too_short", stats)
+        if runtime_cfg.strict_mode:
+            _raise_strict_fallback("window_too_short", stats)
         logger.warning(
             f"UC signal ({actual_duration_minutes:.1f} min) shorter than "
             f"analysis window ({analysis_window_minutes} min)"
@@ -124,6 +156,10 @@ def detect_tachysystole(
     
     # Check if UC signal has meaningful data
     if np.all(uc_clean == 0) or np.std(uc_clean) < 1e-6:
+        stats = _fallback_stats("flat_or_empty", {"analysis_window_minutes": analysis_window_minutes})
+        record_fallback("tachysystole", "flat_or_empty", stats)
+        if runtime_cfg.strict_mode:
+            _raise_strict_fallback("flat_or_empty", stats)
         logger.warning("UC signal appears flat or empty")
         return TachysystoleResult(
             detected=False,

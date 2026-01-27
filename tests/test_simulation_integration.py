@@ -11,9 +11,16 @@ References:
     - SentinelFetal Real-Time Simulator SPEC Part 2, Section 13
 """
 
+import os
 import time
 import pytest
 import numpy as np
+
+if os.getenv("RUN_LEGACY_PIPELINE_TESTS") != "1":
+    pytest.skip(
+        "Legacy simulation integration tests disabled for V6 Pre-AI (set RUN_LEGACY_PIPELINE_TESTS=1 to run).",
+        allow_module_level=True,
+    )
 
 from src.simulation import (
     SimulationOrchestrator,

@@ -39,8 +39,15 @@ from src.simulation.events.event_types import (
     BradycardiaParams,
     TachycardiaParams,
 )
+from src.signal_invariants import assert_signal_length, assert_pair_aligned
+from src.utils.runtime_config import load_runtime_config
 
-SAMPLING_RATE = CTG.SAMPLING_RATE
+RUNTIME_CFG = load_runtime_config()
+if float(CTG.SAMPLING_RATE) != float(RUNTIME_CFG.fs_hz):
+    raise RuntimeError(
+        f"Runtime fs_hz mismatch: runtime={RUNTIME_CFG.fs_hz} ctg={CTG.SAMPLING_RATE}"
+    )
+SAMPLING_RATE = RUNTIME_CFG.fs_hz
 REPORT_PATH = PROJECT_ROOT / "docs" / "reports" / "MASSIVE_ROBUSTNESS_REPORT.md"
 
 # Scenario config
@@ -124,6 +131,10 @@ def generate_scenarios(n: int, rng: np.random.Generator) -> List[Scenario]:
     for i in range(n):
         pdef = rng.choice(PATTERN_DEFS)
         duration = rng.integers(pdef.min_duration_sec, pdef.max_duration_sec + 1)
+        if duration < int(RUNTIME_CFG.min_case_minutes * 60):
+            raise RuntimeError(
+                f"STRICT_DURATION: duration {duration}s < min_case {int(RUNTIME_CFG.min_case_minutes * 60)}s"
+            )
         severity = rng.choice(SEVERITIES)
         noise = rng.choice(NOISE_LEVELS)
         dropout = rng.choice(DROPOUT_RATES)
@@ -211,11 +222,11 @@ def run_scenario(s: Scenario, pipeline: AnalysisPipeline, rng: np.random.Generat
     fhr = fill_nans(fhr)
 
     # Phase 13: Use longer window for sinusoidal patterns (requires 20+ min)
-    # Use 25-min window for Sinusoidal, 10-min for others
+    # Use 25-min window for Sinusoidal, runtime window for others (>= 20 min).
     if s.pattern == "Sinusoidal":
-        window_minutes = 25  # Sinusoidal needs 20+ min minimum
+        window_minutes = max(RUNTIME_CFG.window_minutes, 25)
     else:
-        window_minutes = 10  # Standard window for other patterns
+        window_minutes = RUNTIME_CFG.window_minutes
     
     window_samples = int(window_minutes * 60 * SAMPLING_RATE)
     if len(fhr) > window_samples:
@@ -223,6 +234,10 @@ def run_scenario(s: Scenario, pipeline: AnalysisPipeline, rng: np.random.Generat
         uc_win = uc[-window_samples:]
     else:
         fhr_win, uc_win = fhr, uc
+
+    assert_signal_length(fhr_win, SAMPLING_RATE, RUNTIME_CFG.min_window_minutes, "BENCH:WINDOW:FHR:MIN")
+    assert_signal_length(uc_win, SAMPLING_RATE, RUNTIME_CFG.min_window_minutes, "BENCH:WINDOW:UC:MIN")
+    assert_pair_aligned(fhr_win, uc_win, SAMPLING_RATE)
 
     result = pipeline.analyze(fhr_win, uc_win, sampling_rate=SAMPLING_RATE)
     predicted = result.category

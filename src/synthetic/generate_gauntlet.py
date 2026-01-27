@@ -38,19 +38,34 @@ from src.simulation.events.event_types import (
 )
 from src.config import CTG
 from src.signal_invariants import assert_signal_length, assert_pair_aligned
+from src.utils.runtime_config import load_runtime_config
 
 OUTPUT_DIR = Path("data/synthetic_gauntlet")
-DURATION_SEC = 1800  # 30 minutes baseline duration
+RUNTIME_CFG = load_runtime_config()
+if float(CTG.SAMPLING_RATE) != float(RUNTIME_CFG.fs_hz):
+    raise RuntimeError(
+        f"Runtime fs_hz mismatch: runtime={RUNTIME_CFG.fs_hz} ctg={CTG.SAMPLING_RATE}"
+    )
+DURATION_SEC = int(RUNTIME_CFG.recommended_case_minutes * 60)  # default: 30 minutes
 LONG_DURATION_SEC = 3600  # optional 60-minute stability traces
-MIN_DURATION_SEC = 1200  # stop if shorter than 20 minutes
-SAMPLE_RATE = CTG.SAMPLING_RATE
+MIN_DURATION_SEC = int(RUNTIME_CFG.min_case_minutes * 60)  # hard minimum
+SAMPLE_RATE = RUNTIME_CFG.fs_hz
 SAMPLES_PER_TICK = int(SAMPLE_RATE)  # generate 1-second ticks
 
 
 def run_patient(case_id: str, inject_events: List[Tuple[EventType, object]], baseline_fhr: float = 140.0,
                 variability: float = 10.0, contractions_per_10min: float = 4.0, duration_sec: int = DURATION_SEC) -> Dict:
-    # Enforce 30-minute (or specified) duration at generation time.
+    # Enforce minimum and recommended durations at generation time.
     duration_sec = int(duration_sec)
+    if duration_sec < MIN_DURATION_SEC:
+        raise RuntimeError(
+            f"STRICT_DURATION: {case_id} duration {duration_sec}s < min_case {MIN_DURATION_SEC}s"
+        )
+    if duration_sec < int(RUNTIME_CFG.recommended_case_minutes * 60):
+        raise RuntimeError(
+            f"STRICT_DURATION: {case_id} duration {duration_sec}s < recommended_case "
+            f"{int(RUNTIME_CFG.recommended_case_minutes * 60)}s"
+        )
     cfg = PatientConfig(
         patient_id=case_id,
         bed_number=1,
@@ -72,8 +87,13 @@ def run_patient(case_id: str, inject_events: List[Tuple[EventType, object]], bas
         uc_all.extend(data["uc"].tolist())
 
     expected = duration_sec * SAMPLE_RATE
-    assert_signal_length(fhr_all, SAMPLE_RATE, 30, "GEN:FHR")
-    assert_signal_length(uc_all, SAMPLE_RATE, 30, "GEN:UC")
+    assert_signal_length(fhr_all, SAMPLE_RATE, RUNTIME_CFG.min_case_minutes, "GEN:FHR:MIN")
+    assert_signal_length(uc_all, SAMPLE_RATE, RUNTIME_CFG.min_case_minutes, "GEN:UC:MIN")
+    if duration_sec < int(RUNTIME_CFG.recommended_case_minutes * 60):
+        raise RuntimeError(
+            f"STRICT_DURATION: {case_id} duration {duration_sec}s < recommended_case "
+            f"{int(RUNTIME_CFG.recommended_case_minutes * 60)}s"
+        )
     assert_pair_aligned(fhr_all, uc_all, SAMPLE_RATE)
     if len(fhr_all) != expected or len(uc_all) != expected:
         raise ValueError(
@@ -123,8 +143,13 @@ def build_noise_cases() -> List[Dict]:
     def add_case(cid: str, fhr_sig: np.ndarray, uc_sig: np.ndarray, noise_type: str, desc: str, duration_minutes: float):
         duration_sec = int(round(duration_minutes * 60))
         expected = duration_sec * SAMPLE_RATE
-        assert_signal_length(fhr_sig, SAMPLE_RATE, 30, "GEN:FHR")
-        assert_signal_length(uc_sig, SAMPLE_RATE, 30, "GEN:UC")
+        assert_signal_length(fhr_sig, SAMPLE_RATE, RUNTIME_CFG.min_case_minutes, "GEN:FHR:MIN")
+        assert_signal_length(uc_sig, SAMPLE_RATE, RUNTIME_CFG.min_case_minutes, "GEN:UC:MIN")
+        if duration_sec < int(RUNTIME_CFG.recommended_case_minutes * 60):
+            raise RuntimeError(
+                f"STRICT_DURATION: {cid} duration {duration_sec}s < recommended_case "
+                f"{int(RUNTIME_CFG.recommended_case_minutes * 60)}s"
+            )
         assert_pair_aligned(fhr_sig, uc_sig, SAMPLE_RATE)
         if len(fhr_sig) != expected or len(uc_sig) != expected:
             raise ValueError(
@@ -262,12 +287,18 @@ def write_csv(path: Path, rows: List[Dict]) -> None:
 
 
 def verify_lengths(label: str, rows: List[Dict]) -> None:
-    """Fail fast if any generated trace is shorter than the requested 30m duration."""
+    """Fail fast if any generated trace is shorter than required durations."""
     for row in rows:
         fhr = json.loads(row["fhr"])
         uc = json.loads(row["uc"])
-        assert_signal_length(fhr, SAMPLE_RATE, 30, f"GEN_VERIFY:{label}:FHR")
-        assert_signal_length(uc, SAMPLE_RATE, 30, f"GEN_VERIFY:{label}:UC")
+        assert_signal_length(fhr, SAMPLE_RATE, RUNTIME_CFG.min_case_minutes, f"GEN_VERIFY:{label}:FHR:MIN")
+        assert_signal_length(uc, SAMPLE_RATE, RUNTIME_CFG.min_case_minutes, f"GEN_VERIFY:{label}:UC:MIN")
+        duration_min = len(fhr) / SAMPLE_RATE / 60.0
+        if duration_min < RUNTIME_CFG.recommended_case_minutes:
+            raise RuntimeError(
+                f"STRICT_DURATION: {label} duration {duration_min:.2f} min < "
+                f"recommended_case {RUNTIME_CFG.recommended_case_minutes}"
+            )
         assert_pair_aligned(fhr, uc, SAMPLE_RATE)
 
 
@@ -276,14 +307,18 @@ def verify_post_save(csv_path: Path) -> None:
     df = pd.read_csv(csv_path)
     if df.empty:
         return
-    sample_indices = df.sample(n=min(5, len(df)), random_state=42).index
-    for idx in sample_indices:
-        row = df.loc[idx]
+    for _, row in df.iterrows():
         fhr = json.loads(row["fhr"])
         uc = json.loads(row["uc"])
-        sr = int(row.get("sampling_rate", SAMPLE_RATE))
-        assert_signal_length(fhr, sr, 30, "CSV_RELOAD:FHR")
-        assert_signal_length(uc, sr, 30, "CSV_RELOAD:UC")
+        sr = float(row.get("sampling_rate", SAMPLE_RATE))
+        assert_signal_length(fhr, sr, RUNTIME_CFG.min_case_minutes, "CSV_RELOAD:FHR:MIN")
+        assert_signal_length(uc, sr, RUNTIME_CFG.min_case_minutes, "CSV_RELOAD:UC:MIN")
+        duration_min = len(fhr) / sr / 60.0
+        if duration_min < RUNTIME_CFG.recommended_case_minutes:
+            raise RuntimeError(
+                f"STRICT_DURATION: CSV_RELOAD duration {duration_min:.2f} min < "
+                f"recommended_case {RUNTIME_CFG.recommended_case_minutes}"
+            )
         assert_pair_aligned(fhr, uc, sr)
 
 
@@ -292,7 +327,7 @@ def summarize_cases(all_rows: List[Dict]) -> None:
     samples = []
     for row in all_rows:
         fhr = json.loads(row["fhr"])
-        sr = int(row.get("sampling_rate", SAMPLE_RATE))
+        sr = float(row.get("sampling_rate", SAMPLE_RATE))
         samples.append(len(fhr))
         durations.append(len(fhr) / sr / 60.0)
 

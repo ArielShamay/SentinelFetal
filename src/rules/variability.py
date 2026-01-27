@@ -33,7 +33,9 @@ from typing import Optional
 
 import numpy as np
 
+from src.analysis.fallback_audit import record_fallback, get_case_context
 from src.config import CTG, THRESHOLDS
+from src.utils.runtime_config import load_runtime_config
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -152,6 +154,32 @@ def calculate_variability(
     # Validate input
     if fhr is None or len(fhr) == 0:
         raise VariabilityCalculationError("Input FHR signal is empty or None")
+
+    runtime_cfg = load_runtime_config()
+
+    def _fallback_stats(reason: str, extra: Optional[dict] = None) -> dict:
+        arr = np.asarray(fhr, dtype=float)
+        n = len(arr)
+        duration_min = n / sampling_rate / 60.0 if sampling_rate else float("inf")
+        nan_frac = float(np.mean(np.isnan(arr))) if n else 1.0
+        stats = {
+            "n_samples": n,
+            "duration_min": duration_min,
+            "nan_frac": nan_frac,
+            "reason_detail": reason,
+        }
+        if extra:
+            stats.update(extra)
+        return stats
+
+    def _raise_strict_fallback(reason: str, stats: dict) -> None:
+        case_id = get_case_context()
+        case_tag = case_id if case_id is not None else "unknown"
+        raise RuntimeError(
+            "STRICT_MODE variability fallback | "
+            f"case_id={case_tag} reason={reason} "
+            f"window_seconds={window_seconds} sampling_rate={sampling_rate} stats={stats}"
+        )
     
     # Calculate window parameters
     window_samples = int(window_seconds * sampling_rate)  # 60 * 4 = 240
@@ -159,6 +187,10 @@ def calculate_variability(
     
     # Check if signal is long enough
     if len(fhr) < window_samples:
+        stats = _fallback_stats("window_too_short", {"window_seconds": window_seconds})
+        record_fallback("variability", "too_short", stats)
+        if runtime_cfg.strict_mode:
+            _raise_strict_fallback("window_too_short", stats)
         logger.warning(
             f"Signal too short ({len(fhr)} samples) for {window_seconds}s window. "
             "Using entire signal."
@@ -185,6 +217,10 @@ def calculate_variability(
     
     # Check if we have valid windows
     if not window_variabilities:
+        stats = _fallback_stats("no_valid_windows", {"window_seconds": window_seconds})
+        record_fallback("variability", "no_valid_windows", stats)
+        if runtime_cfg.strict_mode:
+            _raise_strict_fallback("no_valid_windows", stats)
         logger.warning("No valid windows for variability calculation")
         return _create_unknown_result()
     

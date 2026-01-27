@@ -33,6 +33,8 @@ from typing import Optional
 
 import numpy as np
 
+from src.analysis.fallback_audit import record_fallback, get_case_context
+from src.utils.runtime_config import load_runtime_config
 # Configure module logger
 logger = logging.getLogger(__name__)
 
@@ -146,6 +148,20 @@ def detect_decelerations(
     if fhr is None or len(fhr) == 0:
         raise DecelerationDetectionError("Input FHR signal is empty or None")
     if uc is None or len(uc) != len(fhr):
+        runtime_cfg = load_runtime_config()
+        stats = {
+            "n_fhr_samples": int(len(fhr)),
+            "n_uc_samples": int(0 if uc is None else len(uc)),
+            "reason_detail": "uc_missing_or_mismatch",
+        }
+        record_fallback("decelerations", "uc_missing", stats)
+        if runtime_cfg.strict_mode:
+            case_id = get_case_context()
+            case_tag = case_id if case_id is not None else "unknown"
+            raise RuntimeError(
+                "STRICT_MODE decelerations fallback | "
+                f"case_id={case_tag} reason=uc_missing_or_mismatch stats={stats}"
+            )
         logger.warning("UC signal missing or length mismatch. Using zeros.")
         uc = np.zeros_like(fhr)
     

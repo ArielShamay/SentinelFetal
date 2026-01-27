@@ -1,0 +1,7 @@
+fs_hz: 4
+window_minutes: 20
+stride_minutes: 5
+min_window_minutes: 20
+recommended_case_minutes: 30
+min_case_minutes: 20
+strict_mode: true

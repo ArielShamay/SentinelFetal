@@ -43,21 +43,35 @@ from src.signal_invariants import assert_signal_length, assert_pair_aligned
 from src.analysis.fallback_audit import (
     reset_fallback_audit,
     set_case_context,
+    set_window_context,
     get_fallback_records,
     write_fallback_audit,
+    raise_if_any_fallback,
 )
+from src.utils.runtime_config import load_runtime_config, apply_strict_warnings
 
 GAUNTLET_DIR = Path("data/synthetic_gauntlet")
 OUTPUT_PATH = GAUNTLET_DIR / "synthetic_fp_analysis.csv"
 HARD_NEG_PATH = GAUNTLET_DIR / "synthetic_hard_negatives.csv"
 CONFIG_PATH = Path("config/ensemble_v5_optuna.yaml")
 LOGIC_CONFIG_PATH = Path("config/logic_v5_2.yaml")
+RUNTIME_CFG = load_runtime_config()
+if float(CTG.SAMPLING_RATE) != float(RUNTIME_CFG.fs_hz):
+    raise RuntimeError(
+        f"Runtime fs_hz mismatch: runtime={RUNTIME_CFG.fs_hz} ctg={CTG.SAMPLING_RATE}"
+    )
 # DO NOT change analysis windows to silence warnings. Fix generator/pipeline instead.
-# Canonical windowing (training/inference): 20-min window, 5-min stride.
-WINDOW_MINUTES = 20
-STRIDE_MINUTES = 5
-WINDOW_SAMPLES = int(WINDOW_MINUTES * 60 * CTG.SAMPLING_RATE)
-STRIDE_SAMPLES = int(STRIDE_MINUTES * 60 * CTG.SAMPLING_RATE)
+WINDOW_MINUTES = RUNTIME_CFG.window_minutes
+STRIDE_MINUTES = RUNTIME_CFG.stride_minutes
+MIN_WINDOW_MINUTES = RUNTIME_CFG.min_window_minutes
+RECOMMENDED_CASE_MINUTES = RUNTIME_CFG.recommended_case_minutes
+MIN_CASE_MINUTES = RUNTIME_CFG.min_case_minutes
+STRICT_MODE = RUNTIME_CFG.strict_mode
+WINDOW_SAMPLES = int(WINDOW_MINUTES * 60 * RUNTIME_CFG.fs_hz)
+STRIDE_SAMPLES = int(STRIDE_MINUTES * 60 * RUNTIME_CFG.fs_hz)
+SAFE_WARNING_ALLOWLIST = [
+    # Add allowlisted warnings here if they are proven safe.
+]
 
 
 def load_threshold() -> float:
@@ -129,11 +143,21 @@ def run_case(pipeline: AnalysisPipeline, row: Dict, ai_thr: float, logic_cfg: Sm
     case_id = row.get("case_id")
     set_case_context(case_id)
     try:
-        assert_signal_length(fhr, sampling_rate, 30, "RUNNER_RAW:FHR")
-        assert_signal_length(uc, sampling_rate, 30, "RUNNER_RAW:UC")
+        if sampling_rate != RUNTIME_CFG.fs_hz:
+            raise RuntimeError(
+                f"STRICT_FS: {case_id} sampling_rate={sampling_rate} != runtime_fs={RUNTIME_CFG.fs_hz}"
+            )
+        assert_signal_length(fhr, sampling_rate, MIN_CASE_MINUTES, "RUNNER_RAW:FHR:MIN")
+        assert_signal_length(uc, sampling_rate, MIN_CASE_MINUTES, "RUNNER_RAW:UC:MIN")
+        duration_minutes = len(fhr) / sampling_rate / 60.0
+        if duration_minutes < RECOMMENDED_CASE_MINUTES:
+            raise RuntimeError(
+                f"STRICT_DURATION: {case_id} duration {duration_minutes:.2f} min "
+                f"< recommended_case {RECOMMENDED_CASE_MINUTES}"
+            )
         assert_pair_aligned(fhr, uc, sampling_rate)
-        assert_signal_length(fhr, sampling_rate, 30, "PRE_SLICE:FHR")
-        assert_signal_length(uc, sampling_rate, 30, "PRE_SLICE:UC")
+        assert_signal_length(fhr, sampling_rate, MIN_CASE_MINUTES, "PRE_SLICE:FHR:MIN")
+        assert_signal_length(uc, sampling_rate, MIN_CASE_MINUTES, "PRE_SLICE:UC:MIN")
 
         c = pipeline.container
         quality_counts = {"LOW": 0, "MED": 0, "HIGH": 0}
@@ -145,9 +169,10 @@ def run_case(pipeline: AnalysisPipeline, row: Dict, ai_thr: float, logic_cfg: Sm
         ai_flagged_windows = 0
 
         context_samples = int(CTG.TACHYSYSTOLE_WINDOW_MINUTES * 60 * sampling_rate)
-        for start, end, fhr_w, uc_w in window_iter(fhr, uc, context_samples):
-            assert_signal_length(fhr_w, sampling_rate, 20, "WINDOW:FHR")
-            assert_signal_length(uc_w, sampling_rate, 20, "WINDOW:UC")
+        for window_idx, (start, end, fhr_w, uc_w) in enumerate(window_iter(fhr, uc, context_samples)):
+            set_window_context(window_idx)
+            assert_signal_length(fhr_w, sampling_rate, MIN_WINDOW_MINUTES, "WINDOW:FHR:MIN")
+            assert_signal_length(uc_w, sampling_rate, MIN_WINDOW_MINUTES, "WINDOW:UC:MIN")
 
             quality_diag = compute_signal_quality(
                 fhr_w,
@@ -161,7 +186,7 @@ def run_case(pipeline: AnalysisPipeline, row: Dict, ai_thr: float, logic_cfg: Sm
             quality_scores.append(q_value)
 
             uc_ctx = uc[end - context_samples:end] if context_samples > 0 else uc[:end]
-            assert_signal_length(uc_ctx, sampling_rate, 20, "UC_CONTEXT:MIN20")
+            assert_signal_length(uc_ctx, sampling_rate, MIN_WINDOW_MINUTES, "UC_CONTEXT:MIN_WINDOW")
             if len(uc_ctx) < context_samples:
                 raise ValueError(
                     f"CRITICAL: Tachysystole context too short for {case_id}: "
@@ -223,6 +248,8 @@ def run_case(pipeline: AnalysisPipeline, row: Dict, ai_thr: float, logic_cfg: Sm
                 flagged_windows += 1
                 if ai_score >= ai_thr:
                     ai_flagged_windows += 1
+        if not quality_scores:
+            raise RuntimeError(f"STRICT_WINDOWING: {case_id} produced zero windows")
 
         signal_quality = float(np.mean(quality_scores)) if quality_scores else 0.0
         final_decision = int(flagged_windows >= 2)
@@ -246,6 +273,7 @@ def run_case(pipeline: AnalysisPipeline, row: Dict, ai_thr: float, logic_cfg: Sm
             "quality_class": "LOW" if quality_counts["LOW"] > 0 else ("MED" if quality_counts["MED"] > 0 else "HIGH"),
         }
     finally:
+        set_window_context(None)
         set_case_context(None)
 
 
@@ -275,6 +303,7 @@ def analyze_fp(df: pd.DataFrame):
 
 
 def main():
+    apply_strict_warnings(STRICT_MODE, SAFE_WARNING_ALLOWLIST)
     reset_fallback_audit()
     ai_thr = load_threshold()
     logic_cfg = load_logic_cfg()
@@ -287,8 +316,18 @@ def main():
         fhr = json.loads(row["fhr"])
         uc = json.loads(row["uc"])
         fs = float(row.get("sampling_rate", CTG.SAMPLING_RATE))
-        assert_signal_length(fhr, fs, 30, "RUNNER_PREFLIGHT:FHR")
-        assert_signal_length(uc, fs, 30, "RUNNER_PREFLIGHT:UC")
+        if fs != RUNTIME_CFG.fs_hz:
+            raise RuntimeError(
+                f"STRICT_FS: {row.get('case_id')} sampling_rate={fs} != runtime_fs={RUNTIME_CFG.fs_hz}"
+            )
+        assert_signal_length(fhr, fs, MIN_CASE_MINUTES, "RUNNER_PREFLIGHT:FHR:MIN")
+        assert_signal_length(uc, fs, MIN_CASE_MINUTES, "RUNNER_PREFLIGHT:UC:MIN")
+        duration_minutes = len(fhr) / fs / 60.0
+        if duration_minutes < RECOMMENDED_CASE_MINUTES:
+            raise RuntimeError(
+                f"STRICT_DURATION: {row.get('case_id')} duration {duration_minutes:.2f} min "
+                f"< recommended_case {RECOMMENDED_CASE_MINUTES}"
+            )
         assert_pair_aligned(fhr, uc, fs)
         fhr_durations.append(len(fhr) / fs / 60.0)
         uc_durations.append(len(uc) / fs / 60.0)
@@ -302,6 +341,11 @@ def main():
     print(f"FHR duration minutes (min/mean/max): {min_fhr_d:.2f} / {mean_fhr_d:.2f} / {max_fhr_d:.2f}")
     print(f"UC  duration minutes (min/mean/max): {min_uc_d:.2f} / {mean_uc_d:.2f} / {max_uc_d:.2f}")
     print("Skipped cases due to short signal: 0")
+    print(f"STRICT_MODE: {STRICT_MODE}")
+    print(
+        f"Window config: window={WINDOW_MINUTES} min, stride={STRIDE_MINUTES} min, "
+        f"min_window={MIN_WINDOW_MINUTES} min"
+    )
 
     container = PipelineContainer(
         preprocessor=PreprocessorAdapter(),
@@ -323,6 +367,7 @@ def main():
         rows.append(run_case(pipeline, row, ai_thr, logic_cfg))
 
     fallback_records = get_fallback_records()
+    print(f"fallback_count: {len(fallback_records)}")
     if fallback_records:
         audit_path = GAUNTLET_DIR / "gauntlet_fallback_audit.csv"
         write_fallback_audit(audit_path)
@@ -331,6 +376,7 @@ def main():
         print(fb_df.groupby(["module", "reason"]).size())
         print("Fallback details:")
         print(fb_df)
+        raise_if_any_fallback(STRICT_MODE)
         raise RuntimeError(f"CRITICAL: Fallbacks detected. See {audit_path}")
 
     df = pd.DataFrame(rows)
@@ -343,6 +389,10 @@ def main():
     fp.to_csv(HARD_NEG_PATH, index=False)
 
     analyze_fp(df)
+    total_low = int(df["quality_low_windows"].sum())
+    total_med = int(df["quality_med_windows"].sum())
+    total_high = int(df["quality_high_windows"].sum())
+    print(f"Window quality totals: LOW={total_low} MED={total_med} HIGH={total_high}")
     print(f"Saved analysis to {OUTPUT_PATH}")
     print(f"Saved hard negatives to {HARD_NEG_PATH}")
 

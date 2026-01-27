@@ -1,0 +1,20 @@
+record:
+  max_fhr_nan_frac_for_keep: 0.80
+  max_fhr_out_of_range_frac_for_keep: 0.60
+  max_fhr_zero_frac_for_keep: 0.95
+window:
+  hard_low_nan_frac: 0.60
+  hard_low_max_nan_run: 200
+  hard_low_out_of_range_frac: 0.40
+  hard_low_unique_ratio: 0.01
+  hard_low_std_min: 0.5
+  hard_low_std_max: 80.0
+  med_nan_frac: 0.40
+  med_zero_frac: 0.60
+  med_flatline_ratio: 0.92
+  med_jump_count_gt25: 10
+  med_max_abs_jump: 30.0
+interpolation:
+  max_gap_samples_to_fill: 10
+  fill_method: linear
+  do_not_fill_if_gap_too_large: true
