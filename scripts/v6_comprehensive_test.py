@@ -290,14 +290,15 @@ def test_ai_pipeline() -> Tuple[bool, Dict[str, Any]]:
     
     try:
         # Import directly to avoid circular dependencies and wfdb issues
+        # Note: Dynamic loading used to bypass main import chain that has wfdb/pandas issues
         import sys
         import importlib.util
         spec = importlib.util.spec_from_file_location(
-            "xgboost_only_classifier",
+            "xgboost_only_classifier_test",  # Unique name to avoid conflicts
             PROJECT_ROOT / "src" / "adapters" / "xgboost_only_classifier.py"
         )
         xgb_module = importlib.util.module_from_spec(spec)
-        sys.modules['xgboost_only_classifier'] = xgb_module
+        # Note: Not adding to sys.modules to avoid side effects
         spec.loader.exec_module(xgb_module)
         
         XGBoostOnlyClassifier = xgb_module.XGBoostOnlyClassifier
@@ -374,11 +375,11 @@ def test_hybrid_logic() -> Tuple[bool, Dict[str, Any]]:
         import sys
         import importlib.util
         spec = importlib.util.spec_from_file_location(
-            "xgboost_only_classifier",
+            "xgboost_only_classifier_test",
             PROJECT_ROOT / "src" / "adapters" / "xgboost_only_classifier.py"
         )
         xgb_module = importlib.util.module_from_spec(spec)
-        sys.modules['xgboost_only_classifier'] = xgb_module
+        # Not adding to sys.modules to avoid conflicts
         spec.loader.exec_module(xgb_module)
         
         XGBoostOnlyClassifier = xgb_module.XGBoostOnlyClassifier
@@ -440,11 +441,11 @@ def test_json_output() -> Tuple[bool, Dict[str, Any]]:
         import sys
         import importlib.util
         spec = importlib.util.spec_from_file_location(
-            "xgboost_only_classifier",
+            "xgboost_only_classifier_test",
             PROJECT_ROOT / "src" / "adapters" / "xgboost_only_classifier.py"
         )
         xgb_module = importlib.util.module_from_spec(spec)
-        sys.modules['xgboost_only_classifier'] = xgb_module
+        # Not adding to sys.modules to avoid conflicts
         spec.loader.exec_module(xgb_module)
         
         XGBoostOnlyClassifier = xgb_module.XGBoostOnlyClassifier
@@ -664,6 +665,9 @@ def run_stage2_quality() -> QualityMetrics:
             )
         
         # Generate synthetic test data (100 samples)
+        # Note: Using random labels for infrastructure testing only
+        # Real quality metrics require actual CTU-CHB data with pH labels
+        logger.warning("Using synthetic random data - quality metrics are for infrastructure testing only")
         n_samples = 100
         X_test = np.random.randn(n_samples, MINIROCKET_DIM).astype(np.float32)
         y_true = np.random.randint(0, 2, n_samples)  # Binary: 0=normal, 1=pathological
@@ -702,10 +706,14 @@ def run_stage2_quality() -> QualityMetrics:
         fnr = fn / (fn + tp) if (fn + tp) > 0 else 0.0
         
         # Simplified AUC-ROC calculation
-        from sklearn.metrics import roc_auc_score
         try:
+            from sklearn.metrics import roc_auc_score
             auc = roc_auc_score(y_true, y_pred_proba)
-        except:
+        except ImportError:
+            logger.warning("sklearn not available for AUC calculation")
+            auc = 0.5
+        except ValueError as e:
+            logger.warning(f"AUC calculation failed: {e}")
             auc = 0.5
         
         # Latency percentiles

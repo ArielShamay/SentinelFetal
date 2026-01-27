@@ -31,9 +31,15 @@ TOTAL_DIM = MINIROCKET_DIM + CLINICAL_DIM
 
 
 def load_xgb_module():
-    """Load XGBoost module directly to avoid import issues."""
+    """
+    Load XGBoost module directly to avoid import issues.
+    
+    Uses dynamic module loading to bypass circular dependencies and 
+    wfdb/pandas compatibility issues in the main import chain.
+    """
+    import importlib.util
     spec = importlib.util.spec_from_file_location(
-        "xgboost_only_classifier",
+        "xgboost_only_classifier_dynamic",  # Unique name to avoid conflicts
         PROJECT_ROOT / "src" / "adapters" / "xgboost_only_classifier.py"
     )
     xgb_module = importlib.util.module_from_spec(spec)
@@ -210,6 +216,8 @@ def test_v6_adapter_protocol():
     # Test batch
     batch_features = np.random.randn(5, MINIROCKET_DIM)
     batch_proba = classifier.predict_proba(batch_features)
+    # Note: XGBoost returns binary probabilities [P(class 0), P(class 1)]
+    # The 3-class conversion happens in the adapter layer
     assert batch_proba.shape == (5, 2), f"Batch proba should be (5, 2), got {batch_proba.shape}"
     print(f"  [PASS] Batch prediction shape: {batch_proba.shape}")
 
