@@ -1,7 +1,7 @@
 """
 Phase 0 - Window Count Audit
 Counts number of sliding windows per patient using the training pipeline settings.
-Outputs: docs/reports/ensemble_v5/window_stats.csv
+Outputs: REPORTS/ensemble_v5/window_stats.csv
 """
 
 import csv
@@ -20,7 +20,7 @@ from src.ml.training.train_v4_ensemble import (
 )
 
 DATA_DIR = PROJECT_ROOT / "data" / "ctu-chb-intrapartum-cardiotocography-database-1.0.0" / "ctu-chb-intrapartum-cardiotocography-database-1.0.0"
-OUTPUT_PATH = PROJECT_ROOT / "docs" / "reports" / "ensemble_v5" / "window_stats.csv"
+OUTPUT_PATH = PROJECT_ROOT / "REPORTS" / "ensemble_v5" / "window_stats.csv"
 FS_HZ = 4.0
 
 

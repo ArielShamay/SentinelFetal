@@ -1,7 +1,7 @@
 """Experiment B: Grid search for tiered hybrid logic (Smart Gate).
 
 - Uses validation_preds_v5.csv and rule proxy (real rule_score if present, otherwise simulated 50% TP, ~60% precision).
-- Engine selection: auto-read optimization_v5_latest/engine_selection.json (written by Experiment A).
+- Engine selection: auto-read REPORTS/optimization_v5_latest/engine_selection.json (written by Experiment A).
   Fallback: run internal selection with same criteria.
 - Tiered logic:
     Tier 1: if prob > T_high -> alert
@@ -30,9 +30,9 @@ import yaml
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 VAL_PATH = PROJECT_ROOT / "models" / "ensemble_v5" / "validation_preds_v5.csv"
 CONFIG_DEFAULT = PROJECT_ROOT / "config" / "ensemble_v5_optuna.yaml"
-ENGINE_SELECTION = PROJECT_ROOT / "optimization_v5_latest" / "engine_selection.json"
+ENGINE_SELECTION = PROJECT_ROOT / "REPORTS" / "optimization_v5_latest" / "engine_selection.json"
 LOGIC_CONFIG_OUT = PROJECT_ROOT / "config" / "logic_v5_1.yaml"
-TABLE_OUT = PROJECT_ROOT / "optimization_v5_latest" / "logic_comparison_table.md"
+TABLE_OUT = PROJECT_ROOT / "REPORTS" / "optimization_v5_latest" / "logic_comparison_table.md"
 
 np.random.seed(42)
 

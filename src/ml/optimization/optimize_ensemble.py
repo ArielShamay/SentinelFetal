@@ -38,7 +38,7 @@ from src.ml.training.train_v4_ensemble import CTUCHBDataLoader, CTGFeatureExtrac
 DATA_DIR = PROJECT_ROOT / "data" / "ctu-chb-intrapartum-cardiotocography-database-1.0.0" / "ctu-chb-intrapartum-cardiotocography-database-1.0.0"
 MODELS_DIR = PROJECT_ROOT / "models" / "ensemble_v4"
 CONFIG_PATH = PROJECT_ROOT / "config" / "ensemble_v4.yaml"
-OUTPUT_ROOT = PROJECT_ROOT / "docs" / "reports" / "ensemble_v4"
+OUTPUT_ROOT = PROJECT_ROOT / "REPORTS" / "ensemble_v4"
 
 OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 

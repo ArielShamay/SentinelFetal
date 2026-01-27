@@ -351,7 +351,7 @@ def write_report(stats: AuditStats) -> Path:
     ])
 
     # Write report
-    report_path = ROOT / "docs" / "reports" / "DEEP_ENDURANCE_REPORT.md"
+    report_path = ROOT / "REPORTS" / "DEEP_ENDURANCE_REPORT.md"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(report_lines), encoding="utf-8")
 

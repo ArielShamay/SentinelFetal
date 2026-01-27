@@ -8,7 +8,7 @@ Generates 500+ randomized scenarios covering:
 - 3 dropout rates: 0%, 5%, 10%
 - Randomized durations: 30-60 min (≥25 min for sinusoidal)
 
-Runs batch-mode (no time.sleep). Outputs docs/reports/MASSIVE_ROBUSTNESS_REPORT.md.
+Runs batch-mode (no time.sleep). Outputs REPORTS/MASSIVE_ROBUSTNESS_REPORT.md.
 """
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ if float(CTG.SAMPLING_RATE) != float(RUNTIME_CFG.fs_hz):
         f"Runtime fs_hz mismatch: runtime={RUNTIME_CFG.fs_hz} ctg={CTG.SAMPLING_RATE}"
     )
 SAMPLING_RATE = RUNTIME_CFG.fs_hz
-REPORT_PATH = PROJECT_ROOT / "docs" / "reports" / "MASSIVE_ROBUSTNESS_REPORT.md"
+REPORT_PATH = PROJECT_ROOT / "REPORTS" / "MASSIVE_ROBUSTNESS_REPORT.md"
 
 # Scenario config
 NUM_SCENARIOS = 500

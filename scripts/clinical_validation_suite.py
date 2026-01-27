@@ -15,7 +15,7 @@ Generates 5 Clinical Archetypes:
 - Sinusoidal Pattern (Cat III alarm)
 - Heavy Noise (FSQI rejection)
 
-Output: CLINICAL_VALIDATION_REPORT.md with confusion matrix
+Output: REPORTS/CLINICAL_VALIDATION_REPORT.md with confusion matrix
 """
 
 # ============================================================================
@@ -875,7 +875,7 @@ def main():
     report = generate_report(all_stats, all_results)
 
     # Write report
-    report_path = ROOT / "docs" / "reports" / "CLINICAL_VALIDATION_REPORT.md"
+    report_path = ROOT / "REPORTS" / "CLINICAL_VALIDATION_REPORT.md"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report, encoding="utf-8")
 

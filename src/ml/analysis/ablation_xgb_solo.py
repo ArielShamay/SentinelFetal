@@ -5,7 +5,7 @@ Rules:
 - Ensemble uses weights from config; XGB solo uses weight 1.0 on xgb_prob only.
 - Persistence decision: alert if at least 2 windows exceed threshold.
 - Winner: if XGB precision > Ensemble precision AND (Ensemble recall - XGB recall) < 0.03.
-- Saves metrics and winner to optimization_v5_latest/engine_selection.json for Experiment B.
+- Saves metrics and winner to REPORTS/optimization_v5_latest/engine_selection.json for Experiment B.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import yaml
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 DEFAULT_CONFIG = PROJECT_ROOT / "config" / "ensemble_v5_optuna.yaml"
 VAL_PATH = PROJECT_ROOT / "models" / "ensemble_v5" / "validation_preds_v5.csv"
-OUT_PATH = PROJECT_ROOT / "optimization_v5_latest" / "engine_selection.json"
+OUT_PATH = PROJECT_ROOT / "REPORTS" / "optimization_v5_latest" / "engine_selection.json"
 
 
 def load_config(path: Path) -> Dict:

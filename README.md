@@ -53,7 +53,7 @@ Open **http://localhost** in your browser (frontend: 80, API: 8000).
 - **Testing**: Playwright E2E tests
 - **Deployment**: Docker + Nginx
 
-📄 Full migration status: [docs/V3_STATUS.md](docs/V3_STATUS.md)
+📄 Migration status (historical): `REPORTS/history/2026/2026-01-24_V3_STATUS_REPORT.md`
 
 ---
 
@@ -235,8 +235,8 @@ SentinelFetal/
 │   └── simulation/           # Patient generator, orchestrator
 ├── scripts/                  # Validation & testing scripts
 ├── docs/
-│   ├── V3_STATUS.md          # V3 migration status
-│   └── reports/              # Technical documentation
+│   ├── explain/              # Truth-aligned references (UI + system)
+│   └── plan/                 # Immutable plans (PRD/SPECS/Master Plan)
 ├── docker-compose.yml        # Full-stack deployment
 ├── Dockerfile.backend        # Python FastAPI image
 ├── Dockerfile.frontend       # React + Nginx image
@@ -247,15 +247,20 @@ SentinelFetal/
 
 ## 📚 Documentation
 
-### Status & Reality Check
-- **[STATUS.md](docs/STATUS.md)** — Current system state: Backend (Production Ready) vs. Frontend (Alpha/Broken)
-- **[UI_UX_GAP_ANALYSIS.md](docs/reports/UI_UX_GAP_ANALYSIS.md)** — Forensic audit of all UI defects with line numbers
+### Canonical (truth-aligned)
+- **[SYSTEM_REFERENCE.md](docs/explain/SYSTEM_REFERENCE.md)** — Pre‑AI pipeline, ingest, packaging, guardrails
+- **[UI_REFERENCE.md](docs/explain/UI_REFERENCE.md)** — FastAPI/WS contract used by the React UI
+- **[PRD.md](docs/plan/PRD.md)** — Product requirements (Immutable)
+- **[SPECS.md](docs/plan/SPECS.md)** — Engineering specs (Immutable)
+- **[SentinelFetal V6_ תוכנית עבודה מפורטת.md](docs/plan/SentinelFetal%20V6_%20תוכנית%20עבודה%20מפורטת.md)** — Master plan (Immutable)
 
-### Technical Documentation
-- **[TECHNICAL_WHITEPAPER.md](docs/reports/TECHNICAL_WHITEPAPER.md)** — Deep-dive into architecture, algorithms, and clinical logic (V2.0)
-- **[CLINICAL_VALIDATION_REPORT.md](docs/reports/CLINICAL_VALIDATION_REPORT.md)** — Accuracy & sensitivity results
-- **[DEEP_ENDURANCE_REPORT.md](docs/reports/DEEP_ENDURANCE_REPORT.md)** — 35-minute stability test results
-- **[SentinelFetal_V2_PRD_SPECS.md](docs/plan/SentinelFetal_V2_PRD_SPECS.md)** — V2.0 Product Requirements (Backend Implemented, UI Pending)
+### Historical reports (REPORTS/history/2026)
+- `REPORTS/history/2026/2026-01-25_STATUS_REPORT.md`
+- `REPORTS/history/2026/2026-01-24_V3_STATUS_REPORT.md`
+- `REPORTS/history/2026/2026-01-23_UI_UX_GAP_REPORT.md`
+- `REPORTS/history/2026/2026-01-24_TECHNICAL_WHITEPAPER_V3.md`
+- `REPORTS/history/2026/2026-01-23_CLINICAL_VALIDATION.md`
+- `REPORTS/history/2026/2026-01-25_DEEP_ENDURANCE.md`
 
 ---
 

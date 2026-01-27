@@ -201,7 +201,7 @@ class LoadTester:
         print("="*70)
         
         # Save results
-        output_path = Path("docs/reports/load_test_results.json")
+        output_path = Path("REPORTS/load_test_results.json")
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
         with open(output_path, 'w') as f:

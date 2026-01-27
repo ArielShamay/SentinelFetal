@@ -2,7 +2,7 @@
 
 Reads window-level probabilities (validation_preds_v5.csv) and optimizes patient-level
 F2 under safety guardrails. Saves best config to config/ensemble_v5_optuna.yaml and
-plots/summary to optimization_v5_<timestamp>/.
+plots/summary to REPORTS/optimization_v5_<timestamp>/.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
 VAL_PATH = PROJECT_ROOT / "models" / "ensemble_v5" / "validation_preds_v5.csv"
-OUTPUT_DIR_BASE = PROJECT_ROOT / "optimization_v5_{}".format(datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S"))
+OUTPUT_DIR_BASE = PROJECT_ROOT / "REPORTS" / "optimization_v5_{}".format(datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S"))
 CONFIG_OUT = OUTPUT_DIR_BASE / "config" / "ensemble_v5_optuna.yaml"
 REPORT_OUT = OUTPUT_DIR_BASE / "hybrid_validation_report_v5.md"  # placeholder for phase D
 PLOT_RECALL_THR = OUTPUT_DIR_BASE / "recall_vs_threshold.png"
