@@ -21,7 +21,7 @@ sys.path.append(str(PROJECT_ROOT))
 
 VAL_PATH = PROJECT_ROOT / "models" / "ensemble_v5" / "validation_preds_v5.csv"
 CONFIG_PATH = PROJECT_ROOT / "config" / "ensemble_v5_optuna.yaml"
-REPORT_OUT = PROJECT_ROOT / "REPORTS" / "optimization_v5_latest" / "hybrid_validation_report_v5.md"
+REPORT_OUT = PROJECT_ROOT / "REPORTS" / "optimization_v5_latest" / "hybrid_validation_report_v5.txt"
 
 np.random.seed(42)
 

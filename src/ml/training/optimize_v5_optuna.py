@@ -27,7 +27,7 @@ sys.path.append(str(PROJECT_ROOT))
 VAL_PATH = PROJECT_ROOT / "models" / "ensemble_v5" / "validation_preds_v5.csv"
 OUTPUT_DIR_BASE = PROJECT_ROOT / "REPORTS" / "optimization_v5_{}".format(datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S"))
 CONFIG_OUT = OUTPUT_DIR_BASE / "config" / "ensemble_v5_optuna.yaml"
-REPORT_OUT = OUTPUT_DIR_BASE / "hybrid_validation_report_v5.md"  # placeholder for phase D
+REPORT_OUT = OUTPUT_DIR_BASE / "hybrid_validation_report_v5.txt"  # placeholder for phase D
 PLOT_RECALL_THR = OUTPUT_DIR_BASE / "recall_vs_threshold.png"
 PLOT_PR = OUTPUT_DIR_BASE / "precision_recall.png"
 

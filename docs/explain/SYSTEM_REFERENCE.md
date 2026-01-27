@@ -1,93 +1,93 @@
-﻿# System Reference (Truth-Aligned, V6 Pre-AI)
+﻿# System Reference (V6 Pre-AI, Truth-Aligned)
 
 Date: 2026-01-27
-Scope: V6 Pre-AI pipeline, ingest, windowing, and packaging as implemented in code.
+Scope: V6 Pre-AI ingest, invariants, windowing, quality gate, and training-pack packaging (code-backed only).
 
-## Overview
-This reference describes the **Pre-AI** stack only: standardized ingest → RAW invariants → windowing → quality gate → packaging.
-AI training and model details are **out of scope** (handled externally in Colab).
+## Canonical docs (Immutable)
+- docs/plan/PRD.md
+- docs/plan/SPECS.md
+- docs/plan/SentinelFetal V6_ תוכנית עבודה מפורטת.md
+- docs/plan/middlePlan.md
 
-## Canonical documents (Immutable)
-- `docs/plan/PRD.md`
-- `docs/plan/SPECS.md`
-- `docs/plan/SentinelFetal V6_ תוכנית עבודה מפורטת.md`
-- `docs/plan/middlePlan.md` (handoff summary; do not edit)
+## V6 code map (steel wall)
+- V6 Pre-AI pipeline entrypoint: src/v6/pre_ai/pipeline.py (run_pre_ai)
+- V6 ingest loaders: src/v6/pre_ai/ingest/ (ctu_loader.py, ctgd_loader.py, fhrma_loader.py)
+- Runtime config and strict-mode: config/runtime.yaml + src/utils/runtime_config.py (RuntimeConfig, load_runtime_config, apply_strict_warnings)
+- Quality policy: config/v6_quality_policy.yaml + src/v6/pre_ai/quality_policy.py (load_quality_policy)
+- Pack build/verify scripts: scripts/build_v6_training_pack.py, scripts/verify_v6_pipeline_e2e.py, scripts/smoke_import_pre_ai.py
 
-## Key directories
-- `src/v6/pre_ai/` — Pre-AI pipeline (invariants, quality gate, windowing)
-- `src/v6/pre_ai/ingest/` — standardized ingest loaders (CTU/CTGDL/FHRMA)
-- `config/runtime.yaml` — runtime invariants (fs/window/stride/min/strict)
-- `config/v6_quality_policy.yaml` — quality policy & interpolation policy
-- `scripts/` — build pack, verification, smoke and audit scripts
+## Runtime invariants (source of truth)
+Configured in config/runtime.yaml and loaded/validated by src/utils/runtime_config.py (load_runtime_config, _validate_runtime_config):
+- fs_hz: 4
+- window_minutes: 20
+- stride_minutes: 5
+- min_window_minutes: 20
+- min_case_minutes: 20
+- recommended_case_minutes: 30
+- strict_mode: true
 
-## Runtime invariants (single source)
-From `config/runtime.yaml` via `src/utils/runtime_config.py`:
-- `fs_hz = 4`
-- `window_minutes = 20`
-- `stride_minutes = 5`
-- `min_window_minutes = 20`
-- `min_case_minutes = 20`
-- `recommended_case_minutes = 30`
-- `strict_mode = true`
-
-**Fail-fast behavior:**
-- `WarmupError` is raised when signals/windows are shorter than `min_window_minutes`.
-- `apply_strict_warnings(strict_mode)` (used by scripts) converts warnings to errors.
+Strict-mode behavior is implemented by src/utils/runtime_config.py (apply_strict_warnings) and used by scripts/build_v6_training_pack.py and scripts/verify_v6_pipeline_e2e.py.
 
 ## Pre-AI pipeline (execution order)
-Implemented in `src/v6/pre_ai/pipeline.py`:
-1. **RAW invariants** (`assert_raw_invariants`) — numeric, alignment, min duration checks.
-2. **Windowing** (`window_iter`) — 20-minute windows at 4Hz, stride 5 minutes.
-3. **Quality gate** (`quality_gate`) — per-window metrics (nan/zeros/jumps/out-of-range, etc.).
+Implemented in src/v6/pre_ai/pipeline.py (run_pre_ai):
+1) RAW invariants (src/v6/pre_ai/invariants.py: assert_raw_invariants)
+2) Windowing (src/v6/pre_ai/windowing.py: window_iter)
+3) Quality gate per window (src/v6/pre_ai/quality_gate.py: quality_gate)
 
-If no windows are produced, `STRICT_WINDOWING` error is raised.
+Warmup and minimum-length enforcement raise WarmupError in src/v6/pre_ai/invariants.py and src/v6/pre_ai/windowing.py.
+
+## Quality gate (RAW, no AI)
+Quality classification is computed in src/v6/pre_ai/quality_gate.py (quality_gate) and emits HIGH/MED/LOW based on metrics including nan_frac, zeros_frac, max_nan_run, jump_count_gt25, max_abs_jump, flatline_ratio, out_of_range_frac, unique_ratio.
 
 ## Standardized ingest (datasets)
-Loaders create `StandardizedRecord` (`src/v6/pre_ai/ingest/schema.py`):
-- `patient_id`, `fhr_raw`, `uc_raw`, `fs_hz`, `source`, `labels`, `meta`, `record_quality`, optional `fhr_filled/uc_filled`.
+The standardized record schema is defined in src/v6/pre_ai/ingest/schema.py (StandardizedRecord, compute_record_quality).
 
-Datasets used by `scripts/build_v6_training_pack.py`:
-- **CTU-CHB (WFDB)** → target task `Outcome`.
-- **CTGDL (CSV / extracted tar.gz)** → target task `Anatomy` (or `Outcome` if labels indicate pH/outcome).
-- **FHRMA / FSdataset (CSV/MAT/binary)** → target task `Quality`.
+Loaders (source-specific):
+- CTU-CHB WFDB ingest and resample: src/v6/pre_ai/ingest/ctu_loader.py (load_ctu_record)
+- CTGDL CSV ingest: src/v6/pre_ai/ingest/ctgd_loader.py (load_ctgdl_record)
+- FHRMA/FSdataset ingest (CSV/binary heuristics): src/v6/pre_ai/ingest/fhrma_loader.py (load_fhrma_record)
 
-## Packaging (training pack)
-`scripts/build_v6_training_pack.py` builds `training_pack_v6_2.zip` with:
-- `manifest.json` at the zip root.
-- `records/*.npz` with fields:
-  - `fhr_raw`, `uc_raw`
-  - `fhr_filled`, `uc_filled`
-  - `fs_hz`, `patient_id`, `source`
-  - `labels_json`, `meta_json`, `record_quality_json`
+Target task mapping for packs is defined in scripts/build_v6_training_pack.py (_target_task):
+- CTU-CHB → Outcome
+- CTGDL → Anatomy (or Outcome if outcome labels exist)
+- FHRMA → Quality
 
-Manifest includes:
-- `runtime_config`, `quality_policy`, `datasets`, `patients[]`, `stats`, `ctgdl_suggestions`.
+## Training pack format
+The training pack is built in scripts/build_v6_training_pack.py (main, _save_npz, manifest construction, zipfile write):
+- Output zip default: training_pack_v6_2.zip (arg --out)
+- Zip root contains manifest.json (written at manifest_path)
+- records/*.npz entries are written into the zip
 
-Additional reports are written to `REPORTS/` (dataset summary, CTGDL extraction, FHRMA forensics/decoding).
+NPZ fields written by _save_npz (scripts/build_v6_training_pack.py):
+- fhr_raw, uc_raw
+- fhr_filled, uc_filled
+- fs_hz, patient_id, source
+- labels_json, meta_json, record_quality_json
+
+Manifest structure (scripts/build_v6_training_pack.py: manifest dict) includes:
+- runtime_config (fs_hz, window_minutes, stride_minutes, min_window_minutes)
+- quality_policy
+- datasets
+- patients
+- ctgdl_suggestions
+- stats (counts, counts_by_dataset, counts_by_target_task, skipped_by_reason, duration_minutes, quality_class_counts)
+
+End-to-end verification reads manifest.json and records/*.npz and re-runs run_pre_ai in scripts/verify_v6_pipeline_e2e.py.
 
 ## Commands (guardrails & audits)
-All commands run from repo root:
+All commands are defined by these entrypoints and are run from repo root:
 
 ```powershell
-# Import guardrails (strict warnings)
-python -W error -c "import src"
-python -W error scripts/smoke_import_pre_ai.py
-
-# Synthetic gauntlet generation (>=30m cases)
-python -W error src\synthetic\generate_gauntlet.py
-
-# Pre-AI audit (single patient)
+python -W error -c "import src"                         # import guard (module load)
+python -W error scripts/smoke_import_pre_ai.py           # Pre-AI smoke import
+python -W error src\synthetic\generate_gauntlet.py      # synthetic gauntlet generation
 python -W error scripts\debug_run_pre_ai_audit.py --patients 1 --minutes 35 --strict 1
-
-# Build training pack
 python -W error scripts\build_v6_training_pack.py --data-root data --out training_pack_v6_2.zip
-
-# Verify E2E pack
 python -W error scripts\verify_v6_pipeline_e2e.py --pack training_pack_v6_2.zip
 ```
 
-Logs are written under `REPORTS/audit_artifacts/` by the build/verify scripts.
+Log directories for build/verify default to REPORTS/audit_artifacts/<timestamp> (scripts/build_v6_training_pack.py: _ensure_log_dir, scripts/verify_v6_pipeline_e2e.py: log_dir default).
 
-## Out of scope
-- AI model training, hyperparameter tuning, and Colab workflows.
-- Live FastAPI/React UI behavior beyond the API/WS contract in `UI_REFERENCE.md`.
+## Out of scope (this document)
+- AI model training, tuning, and hybrid inference paths (refer to docs/plan/PRD.md and docs/plan/SPECS.md for future scope).
+- UI and frontend integration (refer to UI docs if needed; not covered here).

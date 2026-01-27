@@ -1,0 +1,175 @@
+# =============================================================================
+# SentinelFetal V6.0 — XGBoost-Only Simplified Pipeline Configuration
+# =============================================================================
+# Authority: Production Configuration
+# Last Updated: 2026-01-27
+# DO NOT MODIFY WITHOUT CLINICAL/ML REVIEW APPROVAL
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Pipeline Architecture
+# V6 replaces 3-model ensemble with single MiniRocket -> XGBoost pipeline
+# -----------------------------------------------------------------------------
+pipeline:
+  name: "XGBoost-Only V6"
+  description: "Simplified pipeline using MiniRocket features with XGBoost classifier"
+
+  # Feature extraction
+  feature_extractor: "minirocket"
+  minirocket_path: "models/minirocket_encoder.joblib"
+
+  # Classifier
+  classifier: "xgboost_v5"
+  model_path: "models/ensemble_v5/xgboost_v5.pkl"
+  alternate_model_path: "models/xgboost_v5.pkl"
+
+# -----------------------------------------------------------------------------
+# Feature Configuration
+# MiniRocket (9,996) + Clinical padding (8) = 10,004 total
+# -----------------------------------------------------------------------------
+features:
+  minirocket_dim: 9996          # MiniRocket output features
+  clinical_dim: 8               # Clinical feature padding (zeros)
+  total_dim: 10004              # Total expected by XGBoost model
+
+  # Feature padding strategy
+  padding:
+    enabled: true
+    method: "zeros"             # Pad clinical features with zeros
+    positions: "end"            # Clinical features at end of vector
+
+# -----------------------------------------------------------------------------
+# Risk Thresholds (Probability-based)
+# Same as V4.0 for consistency
+# -----------------------------------------------------------------------------
+thresholds:
+  critical: 0.60      # P > 0.60 -> Critical Alert (Category III)
+  warning: 0.35       # 0.35 < P <= 0.60 -> Warning / Monitor (Category II)
+  normal: 0.35        # P <= 0.35 -> Normal (Category I)
+
+# -----------------------------------------------------------------------------
+# Category Mapping (Same as V4.0)
+# -----------------------------------------------------------------------------
+categories:
+  1:
+    name: "Normal"
+    name_he: "תקין"
+    color: "green"
+    action: "Continue monitoring"
+    action_he: "המשך ניטור"
+  2:
+    name: "Suspicious"
+    name_he: "חשוד"
+    color: "yellow"
+    action: "Enhanced monitoring recommended"
+    action_he: "מומלץ ניטור מוגבר"
+  3:
+    name: "Pathological"
+    name_he: "פתולוגי"
+    color: "red"
+    action: "Immediate clinical attention required"
+    action_he: "נדרשת התייחסות קלינית מיידית"
+
+# -----------------------------------------------------------------------------
+# Smart Hybrid Logic (Tiered Decision System)
+# Same parameters as V4.0 for consistency
+# -----------------------------------------------------------------------------
+smart_logic:
+  enabled: true
+
+  # Tier thresholds
+  t_high: 0.65        # Tier 1: High confidence AI threshold
+  t_low: 0.35         # Tier 2: Grey-zone lower bound
+  q_min: 0.7          # Minimum quality for AI
+
+  # Rule thresholds
+  suspicious_rule: 0.5     # Rule suspicious threshold
+  pathological_rule: 0.8   # Rule pathological threshold (Tier 3 safety net)
+
+  # Persistence filter (K-of-N logic)
+  persistence:
+    enabled: true
+    k: 2              # Alerts in K of N windows
+    n: 3              # Window count
+
+  # Boredom gate
+  boredom_gate:
+    enabled: true
+    suppress_tier2: true   # Suppress grey-zone hallucinations
+
+# -----------------------------------------------------------------------------
+# Safety Configuration
+# -----------------------------------------------------------------------------
+safety:
+  # Rule Engine can ESCALATE but NOT de-escalate
+  # Final_Risk = MAX(AI_Risk, Rule_Engine_Severity)
+  rule_engine_override: true
+  pessimistic_aggregation: true
+
+  # Quality gate
+  quality_gate:
+    enabled: true
+    disable_ai_on_low_quality: true
+    hard_low_triggers:
+      nan_frac_max: 0.60
+      max_nan_run_max: 200
+      unique_ratio_min: 0.05
+      std_min: 1.0
+      std_max: 50.0
+      out_of_range_frac_max: 0.20
+
+# -----------------------------------------------------------------------------
+# Inference Configuration
+# -----------------------------------------------------------------------------
+inference:
+  # Performance constraints
+  max_latency_ms: 50           # Target: faster than V4 ensemble (was 100ms)
+  batch_size: 1                # Single window inference (real-time)
+
+  # Expected feature dimensions
+  input_dim: 10004             # MiniRocket (9996) + padding (8)
+
+  # Calibration
+  calibrated: true             # Model uses CalibratedClassifierCV
+
+# -----------------------------------------------------------------------------
+# Artifact Paths (Relative to project root)
+# -----------------------------------------------------------------------------
+artifacts:
+  model_dir: "models/ensemble_v5"
+  xgboost_path: "models/ensemble_v5/xgboost_v5.pkl"
+  xgboost_alt_path: "models/xgboost_v5.pkl"
+  minirocket_path: "models/minirocket_encoder.joblib"
+
+# -----------------------------------------------------------------------------
+# Compatibility with V4.0 Ensemble
+# -----------------------------------------------------------------------------
+compatibility:
+  # V6 can coexist with V4 ensemble
+  v4_ensemble_available: true
+  fallback_to_v4: false        # Use V6 as primary
+
+  # Migration flags
+  deprecated_models:
+    - "models/ensemble_v4/random_forest_calibrated.pkl"
+    - "models/ensemble_v4/sgd_classifier_calibrated.pkl"
+
+# -----------------------------------------------------------------------------
+# Logging Configuration
+# -----------------------------------------------------------------------------
+logging:
+  level: "INFO"
+  log_predictions: false       # Set true for audit mode
+  log_feature_dim: true        # Log input feature dimensions
+  log_padding: true            # Log when padding is applied
+
+# -----------------------------------------------------------------------------
+# Version Information
+# -----------------------------------------------------------------------------
+version:
+  engine: "6.0.0"
+  config_schema: "1.1"
+  base_model: "xgboost_v5"
+  feature_extractor: "minirocket"
+  last_updated: "2026-01-27"
+  git_commit: null             # Updated by deployment

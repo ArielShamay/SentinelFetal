@@ -465,7 +465,7 @@ def main() -> int:
         "FHRMA": _find_dataset_root(data_root, ["FHRMA", "fhrma", "FSdataset", "fsdataset", "fhr-ma"]),
     }
 
-    fhrma_report = Path("REPORTS") / "FHRMA_FORENSICS_2026.md"
+    fhrma_report = Path("REPORTS") / "FHRMA_FORENSICS_2026.txt"
     _write_fhrma_forensics(fhrma_report, datasets["FHRMA"])
     ctgdl_suggestion_entries: list[dict] = []
 
@@ -498,7 +498,7 @@ def main() -> int:
                 ctgdl_extracted_dirs.append(dest)
         ctgdl_scan_roots = [ctgdl_root] + ctgdl_extracted_dirs
 
-        ctgdl_report = Path("REPORTS") / "CTGDL_EXTRACTION_REPORT_2026.md"
+        ctgdl_report = Path("REPORTS") / "CTGDL_EXTRACTION_REPORT_2026.txt"
         _write_ctgdl_extraction_report(ctgdl_report, ctgdl_archives, ctgdl_inspected, ctgdl_extracted_dirs)
 
     if datasets["FHRMA"] is not None and datasets["FHRMA"].exists():
@@ -874,7 +874,7 @@ def main() -> int:
                     _skip(entry["skip_reason"])
                 _record_patient(entry)
 
-    fhrma_binary_report = Path("REPORTS") / "FHRMA_BINARY_DECODING_REPORT_2026.md"
+    fhrma_binary_report = Path("REPORTS") / "FHRMA_BINARY_DECODING_REPORT_2026.txt"
     _write_fhrma_binary_report(fhrma_binary_report, datasets.get("FHRMA"), fhrma_binary_files, fhrma_decode_stats)
     if "FHRMA" in manifest["datasets"]:
         manifest["datasets"]["FHRMA"]["decode_methods"] = fhrma_decode_stats.get("methods", {})
@@ -888,7 +888,7 @@ def main() -> int:
             "max": float(np.max(durations)),
         }
 
-    ctgdl_report = Path("REPORTS") / "CTGDL_COLUMN_SUGGESTIONS_2026.md"
+    ctgdl_report = Path("REPORTS") / "CTGDL_COLUMN_SUGGESTIONS_2026.txt"
     _write_ctgdl_suggestions(ctgdl_report, ctgdl_suggestion_entries)
 
     manifest_path = log_dir / "training_pack_v6" / "manifest.json"
@@ -900,7 +900,7 @@ def main() -> int:
         for npz_path in sorted(records_dir.glob("*.npz")):
             zf.write(npz_path, f"records/{npz_path.name}")
 
-    report_path = Path("REPORTS") / "DATASET_SUMMARY_V6_2.md"
+    report_path = Path("REPORTS") / "DATASET_SUMMARY_V6_2.txt"
     _write_summary(manifest, report_path)
 
     LOGGER.info("Manifest written to %s", manifest_path)

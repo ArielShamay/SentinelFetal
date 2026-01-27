@@ -182,7 +182,7 @@ class PipelineContainer:
     def get_missing_components(self) -> list:
         """
         Get list of missing component names.
-        
+
         Returns:
             List of component names that are None.
         """
@@ -200,3 +200,71 @@ class PipelineContainer:
             'alert_generator': self.alert_generator
         }
         return [name for name, component in components.items() if component is None]
+
+    @classmethod
+    def create_v6_xgboost(
+        cls,
+        use_mock_moment: bool = False,
+        xgboost_model_path: Optional[str] = None,
+    ) -> 'PipelineContainer':
+        """
+        Create container with V6 simplified pipeline (XGBoost-only).
+
+        Uses MiniRocket for feature extraction and XGBoost v5 for classification.
+        This is the simplified V6 pipeline that replaces the 3-model ensemble.
+
+        Maintains full compatibility with:
+        - Smart Hybrid Logic (tiered decision system)
+        - Rule Engine (safety override)
+        - Quality Gate (Pre-AI validation)
+
+        Args:
+            use_mock_moment: Use mock feature extractor (for testing without GPU).
+            xgboost_model_path: Optional path to XGBoost model file.
+                               Uses default models/ensemble_v5/xgboost_v5.pkl if not provided.
+
+        Returns:
+            Configured PipelineContainer ready for V6 inference.
+
+        Example:
+            >>> container = PipelineContainer.create_v6_xgboost()
+            >>> pipeline = AnalysisPipeline(container)
+
+            # With custom model path:
+            >>> container = PipelineContainer.create_v6_xgboost(
+            ...     xgboost_model_path="models/custom_xgboost.pkl"
+            ... )
+        """
+        from src.adapters import XGBoostV6Adapter
+        from src.adapters.model_adapters import MiniRocketAdapter
+
+        # Use MiniRocket for feature extraction (preferred for V6)
+        try:
+            feature_extractor = MiniRocketAdapter()
+        except (ImportError, Exception):
+            # Fallback to MOMENT if MiniRocket unavailable
+            feature_extractor = MomentAdapter(use_mock=use_mock_moment)
+
+        # Use XGBoost-only classifier (V6 simplified)
+        classifier = XGBoostV6Adapter(model_path=xgboost_model_path)
+
+        return cls(
+            # Data layer
+            preprocessor=PreprocessorAdapter(),
+
+            # Rule engine
+            baseline_calculator=BaselineAdapter(),
+            variability_calculator=VariabilityAdapter(),
+            deceleration_detector=DecelerationAdapter(),
+            tachysystole_detector=TachysystoleAdapter(),
+            sinusoidal_detector=SinusoidalAdapter(),
+
+            # Model layer (V6: MiniRocket + XGBoost)
+            feature_extractor=feature_extractor,
+            feature_fusion=FusionAdapter(),
+            classifier=classifier,
+
+            # Analysis layer
+            medical_override=OverrideAdapter(),
+            alert_generator=AlertAdapter()
+        )

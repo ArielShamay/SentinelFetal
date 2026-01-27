@@ -35,6 +35,16 @@ from .ensemble_adapter import (
     EnsembleClassifierAdapter,
     create_ensemble_classifier,
 )
+from .xgboost_v6_adapter import (
+    XGBoostV6Adapter,
+    create_xgboost_v6_classifier,
+)
+from .xgboost_only_classifier import (
+    XGBoostOnlyClassifier,
+    XGBoostPrediction,
+    get_xgboost_classifier,
+    pad_minirocket_features,
+)
 
 __all__ = [
     # Rule adapters
@@ -50,6 +60,13 @@ __all__ = [
     # Ensemble adapter (V4.0)
     'EnsembleClassifierAdapter',
     'create_ensemble_classifier',
+    # XGBoost V6 adapter
+    'XGBoostV6Adapter',
+    'create_xgboost_v6_classifier',
+    'XGBoostOnlyClassifier',
+    'XGBoostPrediction',
+    'get_xgboost_classifier',
+    'pad_minirocket_features',
     # Analysis adapters
     'OverrideAdapter',
     'AlertAdapter',

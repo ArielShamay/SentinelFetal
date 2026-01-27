@@ -32,7 +32,7 @@ VAL_PATH = PROJECT_ROOT / "models" / "ensemble_v5" / "validation_preds_v5.csv"
 CONFIG_DEFAULT = PROJECT_ROOT / "config" / "ensemble_v5_optuna.yaml"
 ENGINE_SELECTION = PROJECT_ROOT / "REPORTS" / "optimization_v5_latest" / "engine_selection.json"
 LOGIC_CONFIG_OUT = PROJECT_ROOT / "config" / "logic_v5_1.yaml"
-TABLE_OUT = PROJECT_ROOT / "REPORTS" / "optimization_v5_latest" / "logic_comparison_table.md"
+TABLE_OUT = PROJECT_ROOT / "REPORTS" / "optimization_v5_latest" / "logic_comparison_table.txt"
 
 np.random.seed(42)
 
