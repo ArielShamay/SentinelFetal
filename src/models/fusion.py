@@ -380,3 +380,203 @@ def get_feature_names() -> List[str]:
     ])
     
     return names
+
+
+# =============================================================================
+# V6 Feature Vector (10,004 dims: MiniRocket 9,996 + 8 clinical)
+# =============================================================================
+
+# V6 Constants
+V6_FEATURE_VECTOR_DIM = 10004
+MINIROCKET_DIM = 9996
+
+
+@dataclass
+class V6FeatureVector:
+    """
+    Container for V6 feature vector (10,004 dimensions).
+
+    V6 uses MiniRocket (9,996 dims) + 8 clinical features.
+
+    Attributes:
+        vector: The 10,004-dimensional feature vector.
+        start_idx: Start index in the original signal.
+        end_idx: End index in the original signal.
+        start_time_sec: Start time in seconds.
+        end_time_sec: End time in seconds.
+        baseline: Baseline FHR value.
+        variability_value: Variability in bpm.
+        variability_category: Variability category.
+        late_decel_count: Number of late decelerations.
+        variable_decel_count: Number of variable decelerations.
+        recurrent_decels: Whether decelerations are recurrent.
+        tachysystole: Whether tachysystole is present.
+        sinusoidal: Whether sinusoidal pattern is detected.
+    """
+
+    vector: np.ndarray
+    start_idx: int = 0
+    end_idx: int = 0
+    start_time_sec: float = 0.0
+    end_time_sec: float = 0.0
+
+    # Component values for interpretability
+    baseline: float = 0.0
+    variability_value: float = 0.0
+    variability_category: str = "Unknown"
+    late_decel_count: int = 0
+    variable_decel_count: int = 0
+    recurrent_decels: bool = False
+    tachysystole: bool = False
+    sinusoidal: bool = False
+
+    def __post_init__(self) -> None:
+        """Validate vector dimension."""
+        if self.vector.shape != (V6_FEATURE_VECTOR_DIM,):
+            raise ValueError(
+                f"V6 Feature vector must be {V6_FEATURE_VECTOR_DIM}-dimensional, "
+                f"got {self.vector.shape}"
+            )
+
+    def __repr__(self) -> str:
+        return (
+            f"V6FeatureVector(shape={self.vector.shape}, "
+            f"baseline={self.baseline:.0f}, "
+            f"var={self.variability_category})"
+        )
+
+
+def build_v6_feature_vector(
+    embedding: np.ndarray,
+    baseline: Union[float, BaselineResult],
+    variability: Union[dict, VariabilityResult],
+    decelerations: List[Deceleration],
+    tachysystole: Union[dict, TachysystoleResult],
+    sinusoidal: Union[dict, SinusoidalResult],
+    total_contractions: int = 0,
+    start_idx: int = 0,
+    end_idx: int = 0,
+    start_time_sec: float = 0.0,
+    end_time_sec: float = 0.0,
+) -> V6FeatureVector:
+    """
+    Build the V6 feature vector: [MiniRocket (9,996) + 8 clinical features] = 10,004 dims.
+
+    This is used with the V6 XGBoost-only pipeline where the classifier expects
+    10,004 features (9,996 from MiniRocket + 8 clinical features).
+
+    Args:
+        embedding: MiniRocket embedding (should be 9,996 dims).
+        baseline: Baseline FHR value or BaselineResult object.
+        variability: Variability info (dict or VariabilityResult).
+        decelerations: List of detected decelerations.
+        tachysystole: Tachysystole detection result.
+        sinusoidal: Sinusoidal pattern detection result.
+        total_contractions: Total number of contractions in the window.
+        start_idx: Start index of the window.
+        end_idx: End index of the window.
+        start_time_sec: Start time in seconds.
+        end_time_sec: End time in seconds.
+
+    Returns:
+        FeatureVector with 10,004 dims.
+
+    Raises:
+        ValueError: If embedding is not 9,996-dimensional.
+    """
+    # 1. MiniRocket embedding (9,996)
+    emb_arr = np.asarray(embedding, dtype=float).ravel()
+    if emb_arr.size != MINIROCKET_DIM:
+        raise ValueError(f"MiniRocket embedding must be {MINIROCKET_DIM} dims, got {emb_arr.size}")
+
+    features: List[float] = list(emb_arr)
+
+    # 2. Baseline (normalized by 160)
+    if isinstance(baseline, BaselineResult):
+        baseline_value = baseline.value
+    else:
+        baseline_value = float(baseline)
+    features.append(baseline_value / 160.0)
+
+    # 3. Variability value (normalized by 25)
+    if isinstance(variability, VariabilityResult):
+        var_value = variability.value
+        var_category = variability.category
+    else:
+        var_value = variability.get('value', 10.0) or 10.0
+        var_cat_str = variability.get('category', 'Moderate')
+        var_category = VariabilityCategory[var_cat_str.upper()] if isinstance(var_cat_str, str) else var_cat_str
+    features.append(var_value / 25.0)
+
+    # 4. Variability category one-hot (Absent, Minimal, Moderate, Marked)
+    category_order = [
+        VariabilityCategory.ABSENT,
+        VariabilityCategory.MINIMAL,
+        VariabilityCategory.MODERATE,
+        VariabilityCategory.MARKED
+    ]
+    for cat in category_order:
+        features.append(1.0 if var_category == cat else 0.0)
+
+    # 5. Late decel count (normalized by 10)
+    late_count = sum(
+        1 for d in decelerations
+        if d.decel_type == DecelerationType.LATE
+    )
+    features.append(late_count / 10.0)
+
+    # 6. Variable decel count (normalized by 10)
+    variable_count = sum(
+        1 for d in decelerations
+        if d.decel_type == DecelerationType.VARIABLE
+    )
+    features.append(variable_count / 10.0)
+
+    # 7. Recurrent decels flag (>50% of contractions)
+    if total_contractions > 0:
+        decel_ratio = len(decelerations) / total_contractions
+        recurrent = decel_ratio > 0.5
+    else:
+        recurrent = False
+    features.append(1.0 if recurrent else 0.0)
+
+    # 8. Tachysystole flag
+    if isinstance(tachysystole, TachysystoleResult):
+        tachy_detected = tachysystole.detected
+    else:
+        tachy_detected = tachysystole.get('detected', False)
+    features.append(1.0 if tachy_detected else 0.0)
+
+    # 9. Sinusoidal flag
+    if isinstance(sinusoidal, SinusoidalResult):
+        sinus_detected = sinusoidal.detected
+    else:
+        sinus_detected = sinusoidal.get('detected', False)
+    features.append(1.0 if sinus_detected else 0.0)
+
+    # Final vector
+    feature_vector = np.array(features, dtype=np.float32)
+    if feature_vector.shape[0] != V6_FEATURE_VECTOR_DIM:
+        raise ValueError(f"V6 feature vector must be {V6_FEATURE_VECTOR_DIM} dims, got {feature_vector.shape[0]}")
+
+    logger.debug(
+        f"Built V6 feature vector: baseline={baseline_value:.0f}, "
+        f"var={var_category.name if hasattr(var_category, 'name') else var_category}, "
+        f"late_decels={late_count}"
+    )
+
+    return V6FeatureVector(
+        vector=feature_vector,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        start_time_sec=start_time_sec,
+        end_time_sec=end_time_sec,
+        baseline=baseline_value,
+        variability_value=var_value,
+        variability_category=var_category.name if hasattr(var_category, 'name') else str(var_category),
+        late_decel_count=late_count,
+        variable_decel_count=variable_count,
+        recurrent_decels=recurrent,
+        tachysystole=tachy_detected,
+        sinusoidal=sinus_detected,
+    )

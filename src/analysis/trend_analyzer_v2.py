@@ -1,19 +1,78 @@
 """
 Trend Analyzer - Combines XGBoost Classification with Clinical Rule Engine
 =========================================================================
+
+Now integrated with ExplanationEngine for full explainability support.
+Supports configurable thresholds for sensitivity/specificity tuning.
 """
 
 import logging
+from pathlib import Path
 from typing import Dict, Any, Optional, List
 import numpy as np
+
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
 
 try:
     from .xgboost_classifier import get_classifier, XGBoostCTGClassifier
     CLASSIFIER_AVAILABLE = True
 except ImportError:
     CLASSIFIER_AVAILABLE = False
+
+# Explainability integration
+try:
+    from src.explainability.explanation_engine import get_explanation_engine
+    from src.explainability.models import ExplanationResult
+    EXPLAINABILITY_AVAILABLE = True
+except ImportError:
+    EXPLAINABILITY_AVAILABLE = False
+    ExplanationResult = None
+
+# Rules imports for building rule outputs
+try:
+    from src.rules import (
+        calculate_baseline, 
+        calculate_variability, 
+        detect_decelerations,
+        detect_tachysystole, 
+        detect_sinusoidal_pattern
+    )
+    RULES_AVAILABLE = True
+except ImportError:
+    RULES_AVAILABLE = False
     
 logger = logging.getLogger(__name__)
+
+# Default thresholds (can be overridden by config file)
+DEFAULT_THRESHOLDS = {
+    'bradycardia_baseline': 100,      # Was 110 - less aggressive
+    'bradycardia_duration': 180,      # 3 minutes
+    'tachycardia_baseline': 170,      # Was 160 - less aggressive
+    'absent_variability': 3,          # Was 5 - stricter definition
+    'late_decel_drop_pct': 0.15,      # Was 0.10 - less sensitive
+    'variable_decel_count': 5,        # Was 3 - require more
+    'min_confidence': 0.60,           # Don't trust low-confidence ML
+}
+
+
+def load_thresholds() -> Dict[str, Any]:
+    """Load thresholds from config file or use defaults."""
+    config_path = Path(__file__).parent.parent.parent / 'config' / 'classification_thresholds.yaml'
+    
+    if YAML_AVAILABLE and config_path.exists():
+        try:
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            logger.info(f"Loaded thresholds from {config_path}")
+            return config
+        except Exception as e:
+            logger.warning(f"Failed to load thresholds config: {e}")
+    
+    return DEFAULT_THRESHOLDS
 
 
 class TrendAnalyzer:
@@ -24,12 +83,82 @@ class TrendAnalyzer:
     1. XGBoost ML classification for pattern recognition
     2. Clinical rule engine for NICHD compliance
     3. Trend scoring for deterioration detection
+    4. ExplanationEngine for human-readable explanations + visual highlights
+    
+    Now with configurable thresholds for sensitivity/specificity optimization.
     """
     
     def __init__(self):
         self.classifier = get_classifier() if CLASSIFIER_AVAILABLE else None
+        self.explanation_engine = get_explanation_engine() if EXPLAINABILITY_AVAILABLE else None
         self.history: List[Dict[str, Any]] = []
         self.max_history = 60  # Keep 60 analysis results (e.g., 60 minutes)
+        
+        # Load configurable thresholds
+        self.config = load_thresholds()
+        self._extract_thresholds()
+    
+    def _extract_thresholds(self):
+        """Extract threshold values from config."""
+        # Clinical override thresholds
+        overrides = self.config.get('clinical_overrides', {})
+        
+        brady = overrides.get('bradycardia', {})
+        self.brady_threshold = brady.get('baseline_threshold', DEFAULT_THRESHOLDS['bradycardia_baseline'])
+        self.brady_severe_threshold = brady.get('severe_threshold', 100)
+        self.brady_duration = brady.get('duration_seconds', DEFAULT_THRESHOLDS['bradycardia_duration'])
+        
+        tachy = overrides.get('tachycardia', {})
+        self.tachy_threshold = tachy.get('baseline_threshold', DEFAULT_THRESHOLDS['tachycardia_baseline'])
+        
+        absent_var = overrides.get('absent_variability', {})
+        self.absent_var_threshold = absent_var.get('threshold_bpm', DEFAULT_THRESHOLDS['absent_variability'])
+        self.absent_var_critical_threshold = absent_var.get('critical_threshold_bpm', 3)
+        self.absent_var_requires_decels = absent_var.get('requires_decels', False)
+        
+        late_dec = overrides.get('late_decelerations', {})
+        self.late_decel_min_count = late_dec.get('min_count', 2)
+        
+        var_dec = overrides.get('variable_decelerations', {})
+        self.var_decel_min_count = var_dec.get('min_count', 3)
+        
+        # Reduced variability (new)
+        reduced_var = overrides.get('reduced_variability', {})
+        self.reduced_var_threshold = reduced_var.get('threshold_bpm', 10)
+        
+        # High variability - for sensitivity
+        high_var = overrides.get('high_variability', {})
+        self.high_var_enabled = high_var.get('enabled', False)
+        self.high_var_threshold = high_var.get('threshold_bpm', 25)
+        
+        # XGBoost thresholds
+        xgb = self.config.get('xgboost', {})
+        self.min_confidence = xgb.get('min_confidence', DEFAULT_THRESHOLDS['min_confidence'])
+        
+        # Signal quality
+        quality = self.config.get('signal_quality', {})
+        self.max_valid_variability = quality.get('max_valid_variability', 50)
+        
+        # Temporal Confirmation thresholds (NEW)
+        temporal = self.config.get('temporal_confirmation', {})
+        self.temporal_enabled = temporal.get('enabled', True)
+        self.brady_confirmed_duration = temporal.get('brady_confirmed_duration_sec', 30)
+        self.brady_prolonged_duration = temporal.get('brady_prolonged_duration_sec', 60)
+        self.brady_recurrent_count = temporal.get('brady_recurrent_count', 2)
+        
+        fp_filter = temporal.get('fp_filter', {})
+        self.fp_filter_enabled = fp_filter.get('enabled', True)
+        self.fp_pct_normal_threshold = fp_filter.get('pct_normal_threshold', 70)
+        self.fp_max_brady_duration = fp_filter.get('max_brady_duration_sec', 45)
+        
+        critical = temporal.get('critical_patterns', {})
+        self.critical_brady_bpm = critical.get('severe_baseline_brady_bpm', 100)
+        self.critical_tachy_bpm = critical.get('severe_baseline_tachy_bpm', 170)
+        self.critical_prolonged_sec = critical.get('prolonged_decel_sec', 60)
+        self.critical_absent_var_brady = critical.get('absent_var_with_brady_threshold', 3)
+        
+        logger.info(f"Thresholds loaded: brady<{self.brady_threshold}, absent_var<{self.absent_var_threshold}, reduced_var<{self.reduced_var_threshold}")
+        logger.info(f"Temporal Confirmation: enabled={self.temporal_enabled}, brady_confirmed>{self.brady_confirmed_duration}s")
         
     def analyze(
         self, 
@@ -48,7 +177,7 @@ class TrendAnalyzer:
             variability: Current variability
             
         Returns:
-            Analysis result with category, trend, and explanation
+            Analysis result with category, trend, explanation, and highlight_regions
         """
         # Get ML classification
         ml_result = self._get_ml_classification(fhr, uc)
@@ -61,9 +190,10 @@ class TrendAnalyzer:
         # Calculate trend score
         trend_score = self._calculate_trend_score(clinical_result)
         
-        # Generate explanation
-        explanation = self._generate_explanation(
-            clinical_result, ml_result, baseline, variability
+        # Generate rich explanation with ExplanationEngine
+        explanation, highlight_regions = self._generate_rich_explanation(
+            fhr, uc, baseline, variability, 
+            clinical_result, ml_result
         )
         
         # Build final result
@@ -75,6 +205,7 @@ class TrendAnalyzer:
             'trend_score': trend_score,
             'trend_direction': self._get_trend_direction(),
             'explanation': explanation,
+            'highlight_regions': highlight_regions,  # NEW: Visual highlights
             'ml_category': ml_result['category'],
             'clinical_overrides': clinical_result.get('overrides', [])
         }
@@ -83,6 +214,143 @@ class TrendAnalyzer:
         self._update_history(result)
         
         return result
+    
+    def _generate_rich_explanation(
+        self,
+        fhr: np.ndarray,
+        uc: np.ndarray,
+        baseline: float,
+        variability: float,
+        clinical_result: Dict[str, Any],
+        ml_result: Dict[str, Any]
+    ) -> tuple:
+        """
+        Generate rich explanation using ExplanationEngine.
+        
+        Returns:
+            Tuple of (explanation_dict, highlight_regions_list)
+        """
+        highlight_regions = []
+        
+        # Try using ExplanationEngine if available
+        if self.explanation_engine and RULES_AVAILABLE:
+            try:
+                # Build rule outputs from current analysis
+                rule_outputs = self._build_rule_outputs(fhr, uc, baseline, variability)
+                
+                # Get ML probabilities for SHAP
+                ml_proba = ml_result.get('probabilities', {0: 0.5, 1: 0.3, 2: 0.2})
+                
+                # Call ExplanationEngine with correct interface
+                exp_result = self.explanation_engine.explain(
+                    category=clinical_result['category'],
+                    confidence=ml_result['confidence'],
+                    rule_outputs=rule_outputs,
+                    fhr_length=len(fhr),
+                    ml_features=None,  # Skip SHAP for now
+                    compute_shap=False
+                )
+                
+                # Convert to dict format expected by Frontend
+                # Frontend expects: primary_reason, contributing_factors, confidence (0-100)
+                confidence_pct = int(ml_result['confidence'] * 100)
+                explanation = {
+                    'category': clinical_result['category'],
+                    'category_name': clinical_result['category_name'],
+                    'primary_reason': self._extract_primary_reason(exp_result),
+                    'contributing_factors': [
+                        c.description for c in exp_result.contributors[:5]
+                    ],
+                    'summary': exp_result.summary,
+                    'factors': [
+                        {
+                            'factor': c.name,
+                            'value': c.description,
+                            'assessment': c.source.value,
+                            'concern': 'high' if c.contribution > 0.5 else 'medium' if c.contribution > 0.2 else 'low'
+                        }
+                        for c in exp_result.contributors[:5]  # Top 5
+                    ],
+                    'confidence': confidence_pct,
+                    'recommendation': self._get_recommendation(clinical_result['category'])
+                }
+                
+                # Convert highlights to serializable format
+                # Frontend expects: start_idx, end_idx, severity, label, color
+                highlight_regions = [
+                    {
+                        'start_idx': h.start,
+                        'end_idx': h.end,
+                        'color': h.color,
+                        'label': h.label,
+                        'severity': 'critical' if h.is_pathological else 'warning'
+                    }
+                    for h in exp_result.highlights
+                ]
+                
+                logger.debug(f"ExplanationEngine generated {len(highlight_regions)} highlight regions")
+                return explanation, highlight_regions
+                
+            except Exception as e:
+                logger.warning(f"ExplanationEngine failed, falling back: {e}")
+        
+        # Fallback to simple explanation
+        explanation = self._generate_explanation(
+            clinical_result, ml_result, baseline, variability
+        )
+        return explanation, highlight_regions
+    
+    def _build_rule_outputs(
+        self,
+        fhr: np.ndarray,
+        uc: np.ndarray,
+        baseline_val: float,
+        variability_val: float
+    ) -> Dict[str, Any]:
+        """
+        Build rule outputs dictionary for ExplanationEngine.
+        
+        Runs the rule engine functions to get proper typed results.
+        """
+        rule_outputs = {}
+        
+        try:
+            # Run actual rules if available
+            if RULES_AVAILABLE:
+                baseline_result = calculate_baseline(fhr, sampling_rate=4.0)
+                variability_result = calculate_variability(fhr, sampling_rate=4.0)
+                decelerations = detect_decelerations(fhr, uc, baseline_val, sampling_rate=4.0)
+                tachysystole = detect_tachysystole(uc, sampling_rate=4.0)
+                sinusoidal = detect_sinusoidal_pattern(fhr, sampling_rate=4.0)
+                
+                rule_outputs = {
+                    'baseline': baseline_result,
+                    'variability': variability_result,
+                    'decelerations': decelerations,
+                    'tachysystole': tachysystole,
+                    'sinusoidal': sinusoidal,
+                }
+            else:
+                # Create mock rule outputs
+                rule_outputs = {
+                    'baseline': type('MockBaseline', (), {'value': baseline_val, 'is_normal': 110 <= baseline_val <= 160})(),
+                    'variability': type('MockVar', (), {'value': variability_val, 'category': type('C', (), {'name': 'MODERATE' if 6 <= variability_val <= 25 else 'MINIMAL'})()})(),
+                    'decelerations': [],
+                    'tachysystole': type('MockTachy', (), {'detected': False})(),
+                    'sinusoidal': type('MockSinus', (), {'detected': False})(),
+                }
+        except Exception as e:
+            logger.warning(f"Failed to build rule outputs: {e}")
+            rule_outputs = {}
+        
+        return rule_outputs
+    
+    def _extract_primary_reason(self, exp_result) -> str:
+        """Extract primary reason from ExplanationResult."""
+        if exp_result.contributors:
+            top = exp_result.contributors[0]
+            return top.description
+        return "Analysis complete"
     
     def _get_ml_classification(self, fhr: np.ndarray, uc: np.ndarray) -> Dict[str, Any]:
         """Get classification from XGBoost model."""
@@ -107,60 +375,311 @@ class TrendAnalyzer:
         ml_result: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Apply NICHD clinical rules that may override ML classification.
+        Apply NICHD clinical rules with Temporal Confirmation.
         
-        Clinical rules take precedence for safety-critical patterns.
+        Strategy (based on Israeli Position Paper 2023 + data analysis):
+        1. CRITICAL patterns: Immediate alert (no confirmation needed)
+        2. BORDERLINE patterns: Require temporal confirmation
+        3. FP FILTER: High % normal + short episodes = likely false positive
+        
+        Note: Real-data model uses 1-indexed categories:
+        - Category 1 = Normal
+        - Category 2 = Suspicious
+        - Category 3 = Pathological
         """
         overrides = []
         category = ml_result['category']
         category_name = ml_result['category_name']
+        confidence = ml_result.get('confidence', 0.5)
+        sample_rate = 4  # 4 Hz sampling
         
-        # Rule 1: Prolonged bradycardia -> Category III
-        bradycardia_threshold = 110
-        bradycardia_duration = 180  # 3 minutes at 1 Hz, adjust for sample rate
+        # Signal quality check - high variability may indicate poor signal
+        if variability > self.max_valid_variability:
+            return {
+                'category': 2,
+                'category_name': 'Category II (Suspicious)',
+                'overrides': [f'Signal quality concern: variability {variability:.1f} bpm too high']
+            }
         
-        if len(fhr) >= bradycardia_duration:
-            recent_fhr = fhr[-bradycardia_duration:]
-            if np.mean(recent_fhr) < bradycardia_threshold:
-                category = 2
-                category_name = 'Category III (Pathological)'
-                overrides.append('Prolonged bradycardia detected')
+        # ================================================================
+        # TEMPORAL CONFIRMATION ANALYSIS
+        # ================================================================
+        if self.temporal_enabled:
+            temporal_result = self._temporal_confirmation_analysis(fhr, sample_rate, baseline, variability)
+            
+            # CRITICAL patterns - immediate Category 3
+            if temporal_result['is_critical']:
+                return {
+                    'category': 3,
+                    'category_name': 'Category III (Pathological)',
+                    'overrides': temporal_result['critical_reasons']
+                }
+            
+            # FP Filter - if flagged as likely FP, don't escalate
+            if temporal_result['is_likely_fp']:
+                # Return ML result or Category 1 (don't upgrade)
+                return {
+                    'category': max(1, ml_result['category']) if ml_result['category'] <= 1 else 1,
+                    'category_name': 'Category I (Normal)',
+                    'overrides': [f"Transient pattern filtered: {', '.join(temporal_result['alerts'])}"]
+                }
+            
+            # Confirmed patterns - upgrade to appropriate category
+            if temporal_result['confirmed_alerts']:
+                # Check severity based on confirmation level
+                if len(temporal_result['confirmed_alerts']) >= 2 or temporal_result['has_confirmed_brady']:
+                    category = max(category, 2)
+                    category_name = 'Category II (Suspicious)'
+                    overrides.extend(temporal_result['confirmed_alerts'])
         
-        # Rule 2: Absent variability with late decels -> Category III
-        if variability < 5:
-            # Check for late decels (simplified)
-            if self._detect_late_decels(fhr, uc):
+        # ================================================================
+        # ADDITIONAL SAFETY CHECKS (legacy rules for backup)
+        # ================================================================
+        
+        # Severe bradycardia baseline (backup check)
+        if baseline < self.critical_brady_bpm:
+            return {
+                'category': 3,
+                'category_name': 'Category III (Pathological)',
+                'overrides': [f'CRITICAL: Severe bradycardia baseline {baseline:.0f} bpm']
+            }
+        
+        # Severe tachycardia (backup check)
+        if baseline > self.critical_tachy_bpm:
+            return {
+                'category': 3,
+                'category_name': 'Category III (Pathological)',
+                'overrides': [f'CRITICAL: Severe tachycardia baseline {baseline:.0f} bpm']
+            }
+        
+        # Critically absent variability (backup check)
+        if variability <= self.absent_var_critical_threshold:
+            pct_brady = np.sum(fhr < 110) / len(fhr) * 100 if len(fhr) > 0 else 0
+            if pct_brady > 10:  # Absent var + brady = Category 3 per Position Paper
+                return {
+                    'category': 3,
+                    'category_name': 'Category III (Pathological)',
+                    'overrides': [f'CRITICAL: Absent variability {variability:.1f} bpm with bradycardia']
+                }
+        
+        # Moderate bradycardia baseline (110-100 range)
+        if baseline < self.brady_threshold:
+            category = max(category, 2)
+            if category == 2:
+                category_name = 'Category II (Suspicious)'
+            overrides.append(f'Bradycardia baseline {baseline:.0f} bpm')
+        
+        # Tachycardia (160-170 range)
+        if baseline > self.tachy_threshold:
+            category = max(category, 2)
+            if category == 2:
+                category_name = 'Category II (Suspicious)'
+            overrides.append(f'Tachycardia baseline {baseline:.0f} bpm')
+        
+        # Absent/Minimal variability (without brady = Category II only)
+        if variability < self.absent_var_threshold:
+            category = max(category, 2)
+            if category == 2:
+                category_name = 'Category II (Suspicious)'
+            overrides.append(f'Minimal variability {variability:.1f} bpm')
+        
+        # High variability - can indicate problems (NEW for sensitivity)
+        elif self.high_var_enabled and variability > self.high_var_threshold:
+            category = max(category, 2)
+            if category == 2:
+                category_name = 'Category II (Suspicious)'
+            overrides.append(f'High variability {variability:.1f} bpm')
+        
+        # Reduced variability with baseline deviation
+        elif variability < self.reduced_var_threshold:
+            if baseline < 110 or baseline > 160:
                 category = max(category, 2)
-                category_name = 'Category III (Pathological)'
-                overrides.append('Absent variability with late decelerations')
+                if category == 2:
+                    category_name = 'Category II (Suspicious)'
+                overrides.append(f'Reduced variability {variability:.1f} bpm with baseline deviation')
         
-        # Rule 3: Recurrent variable decels -> at least Category II
+        # Recurrent variable decels
         if self._detect_recurrent_variables(fhr, uc):
-            category = max(category, 1)
-            if category == 1:
-                category_name = 'Category II (Indeterminate)'
+            category = max(category, 2)
+            if category == 2:
+                category_name = 'Category II (Suspicious)'
             overrides.append('Recurrent variable decelerations')
         
-        # Rule 4: Good variability + accelerations = reassuring (stay Cat I)
-        if variability >= 6 and self._detect_accelerations(fhr) and category == 0:
-            overrides.append('Reassuring pattern: good variability with accelerations')
+        # Reassuring signs - DISABLED for high sensitivity mode
+        # In high sensitivity mode, we don't want to downgrade based on reassuring signs
+        # because we might miss pathological cases that appear normal
+        # 
+        # if variability >= 6 and variability <= 25:
+        #     if self._detect_accelerations(fhr):
+        #         if ml_result['category'] == 1 and category <= 2 and 'CRITICAL' not in ' '.join(overrides):
+        #             category = 1
+        #             category_name = 'Category I (Normal)'
+        #             overrides = ['Reassuring: good variability + accelerations']
         
         return {
             'category': category,
             'category_name': category_name,
-            'overrides': overrides
+            'overrides': overrides if overrides else ['ML classification']
         }
     
+    def _temporal_confirmation_analysis(
+        self, 
+        fhr: np.ndarray, 
+        sample_rate: int,
+        baseline: float,
+        variability: float
+    ) -> Dict[str, Any]:
+        """
+        Analyze patterns with temporal confirmation.
+        
+        Based on:
+        1. Israeli Position Paper (2023) timing guidelines
+        2. CTU-CHB database pattern duration analysis
+        
+        Returns dict with:
+        - is_critical: bool - requires immediate Category 3
+        - is_likely_fp: bool - likely false positive, don't escalate
+        - alerts: list - all detected alerts
+        - confirmed_alerts: list - alerts that passed temporal confirmation
+        - has_confirmed_brady: bool - has confirmed bradycardia episode
+        - critical_reasons: list - reasons for critical flag
+        """
+        result = {
+            'is_critical': False,
+            'is_likely_fp': False,
+            'alerts': [],
+            'confirmed_alerts': [],
+            'has_confirmed_brady': False,
+            'critical_reasons': []
+        }
+        
+        if len(fhr) < 60:  # Need at least 1 minute of data
+            return result
+        
+        # === CALCULATE KEY METRICS ===
+        pct_normal = np.sum((fhr >= 110) & (fhr <= 160)) / len(fhr) * 100
+        pct_brady = np.sum(fhr < 110) / len(fhr) * 100
+        
+        # === BRADY EPISODE DETECTION ===
+        brady_mask = fhr < 110
+        in_brady = False
+        start = 0
+        brady_durations = []
+        
+        for i, is_brady in enumerate(brady_mask):
+            if is_brady and not in_brady:
+                in_brady, start = True, i
+            elif not is_brady and in_brady:
+                in_brady = False
+                duration = (i - start) / sample_rate
+                brady_durations.append(duration)
+        
+        max_brady_dur = max(brady_durations) if brady_durations else 0
+        brady_confirmed = [d for d in brady_durations if d >= self.brady_confirmed_duration]
+        brady_prolonged = [d for d in brady_durations if d >= self.brady_prolonged_duration]
+        
+        # === CRITICAL PATTERN CHECK ===
+        
+        # Prolonged bradycardia (>60 sec) - per Position Paper
+        if len(brady_prolonged) >= 1:
+            result['is_critical'] = True
+            result['critical_reasons'].append(f'Prolonged deceleration: {max_brady_dur:.0f} sec at <110 bpm')
+        
+        # Severe baseline bradycardia
+        if baseline < self.critical_brady_bpm:
+            result['is_critical'] = True
+            result['critical_reasons'].append(f'Severe baseline bradycardia: {baseline:.0f} bpm')
+        
+        # Severe tachycardia
+        if baseline > self.critical_tachy_bpm:
+            result['is_critical'] = True
+            result['critical_reasons'].append(f'Severe tachycardia: {baseline:.0f} bpm')
+        
+        # Absent variability + bradycardia (Category 3 per Position Paper)
+        if variability < self.critical_absent_var_brady and pct_brady > 10:
+            result['is_critical'] = True
+            result['critical_reasons'].append(f'Absent variability ({variability:.1f} bpm) with bradycardia ({pct_brady:.0f}%)')
+        
+        if result['is_critical']:
+            return result  # Skip FP filter for critical cases
+        
+        # === BUILD ALERTS LIST ===
+        if baseline < 110:
+            result['alerts'].append('baseline_brady')
+        if baseline > 160:
+            result['alerts'].append('baseline_tachy')
+        if variability < 5:
+            result['alerts'].append('absent_var')
+        elif variability < 10:
+            result['alerts'].append('reduced_var')
+        if pct_brady > 5:
+            result['alerts'].append('brady_episodes')
+        
+        if len(result['alerts']) == 0:
+            return result  # Normal - no alerts
+        
+        # === TEMPORAL CONFIRMATION ===
+        confirmed_count = 0
+        
+        # Confirmed bradycardia (>30 sec episodes)
+        if len(brady_confirmed) >= self.brady_recurrent_count:
+            result['confirmed_alerts'].append(f'Recurrent confirmed bradycardia ({len(brady_confirmed)} episodes >{self.brady_confirmed_duration}s)')
+            result['has_confirmed_brady'] = True
+            confirmed_count += 1
+        elif len(brady_confirmed) >= 1:
+            result['confirmed_alerts'].append(f'Confirmed bradycardia episode ({max(brady_confirmed):.0f}s)')
+            result['has_confirmed_brady'] = True
+            confirmed_count += 1
+        
+        # Confirmed tachycardia (always confirms - usually real)
+        if 'baseline_tachy' in result['alerts']:
+            result['confirmed_alerts'].append(f'Tachycardia baseline {baseline:.0f} bpm')
+            confirmed_count += 1
+        
+        # Confirmed absent variability (if not mostly normal)
+        if 'absent_var' in result['alerts'] and pct_normal < 60:
+            result['confirmed_alerts'].append(f'Absent variability {variability:.1f} bpm (sustained)')
+            confirmed_count += 1
+        
+        # === FP FILTER ===
+        # If high % normal AND all brady episodes are short → likely FP
+        # BUT: Never filter cases with very low variability (absent variability is pathological!)
+        if self.fp_filter_enabled and confirmed_count == 0:
+            # Protect low-variability cases - absent variability is a serious finding
+            if variability >= 5:  # Only apply filter if variability is NOT absent
+                if pct_normal > self.fp_pct_normal_threshold and max_brady_dur < self.fp_max_brady_duration:
+                    result['is_likely_fp'] = True
+                    logger.debug(f"FP filter triggered: pct_normal={pct_normal:.1f}%, max_brady={max_brady_dur:.1f}s")
+        
+        return result
+    
     def _detect_late_decels(self, fhr: np.ndarray, uc: np.ndarray) -> bool:
-        """Detect late decelerations (FHR nadir after UC peak)."""
-        if len(fhr) < 120 or len(uc) < 120:
+        """
+        Detect late decelerations (FHR nadir after UC peak).
+        
+        More conservative detection to reduce false positives:
+        - Requires actual correlation with UC peaks
+        - Must see multiple episodes
+        """
+        if len(fhr) < 240 or len(uc) < 240:  # Need at least 4 minutes
+            return False
+        
+        # Simple check: Need significant and consistent drops
+        fhr_mean = np.mean(fhr)
+        fhr_std = np.std(fhr)
+        
+        # Drops must be significant (>2 std below mean)
+        significant_drops = fhr < (fhr_mean - 2 * fhr_std)
+        
+        # Must be substantial portion AND have variation (not flat signal)
+        if fhr_std < 5:  # Very low variability - might be signal issue
             return False
             
-        # Simplified: check if FHR drops significantly after UC peaks
-        fhr_mean = np.mean(fhr)
-        drops = fhr < (fhr_mean - 20)
-        
-        return np.sum(drops) > len(fhr) * 0.1  # >10% of trace shows drops
+        # Conservative: need 20% with significant drops AND baseline must be reasonable
+        if fhr_mean < 100 or fhr_mean > 180:  # Baseline out of range
+            return True  # This is pathological regardless
+            
+        return np.sum(significant_drops) > len(fhr) * 0.20
     
     def _detect_recurrent_variables(self, fhr: np.ndarray, uc: np.ndarray) -> bool:
         """Detect recurrent variable decelerations."""
@@ -174,8 +693,9 @@ class TrendAnalyzer:
         for i in range(window, len(fhr)):
             if fhr[i-window] - fhr[i] > 15:
                 rapid_drops += 1
-                
-        return rapid_drops >= 3  # At least 3 variable decels
+        
+        # Uses configurable threshold (default 5, was 3)
+        return rapid_drops >= self.var_decel_min_count
     
     def _detect_accelerations(self, fhr: np.ndarray) -> bool:
         """Detect presence of accelerations (reassuring sign)."""

@@ -275,3 +275,18 @@ class ExplanationEngine:
             self.shap_explainer is not None and
             self.shap_explainer.is_available
         )
+
+
+# =========================================================================
+# Singleton Instance
+# =========================================================================
+
+_engine_instance: Optional[ExplanationEngine] = None
+
+
+def get_explanation_engine() -> ExplanationEngine:
+    """Get or create the singleton ExplanationEngine instance."""
+    global _engine_instance
+    if _engine_instance is None:
+        _engine_instance = ExplanationEngine()
+    return _engine_instance

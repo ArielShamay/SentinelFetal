@@ -20,6 +20,7 @@ from .rule_adapters import (
 )
 from .model_adapters import (
     MomentAdapter,
+    MiniRocketAdapter,
     ClassifierAdapter,
     FusionAdapter,
 )
@@ -55,6 +56,7 @@ __all__ = [
     'SinusoidalAdapter',
     # Model adapters
     'MomentAdapter',
+    'MiniRocketAdapter',
     'ClassifierAdapter',
     'FusionAdapter',
     # Ensemble adapter (V4.0)

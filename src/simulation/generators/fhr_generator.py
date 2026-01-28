@@ -82,6 +82,10 @@ class FHRGenerator:
         self._phase = 0.0
         self._time = 0.0
         self._rng = np.random.default_rng()
+        
+        # Track active decelerations across ticks
+        # Each entry: (nadir_time, depth_bpm, sigma, end_time)
+        self._active_decelerations: List[tuple] = []
     
     def generate_samples(
         self,
@@ -223,40 +227,59 @@ class FHRGenerator:
         
         Late decelerations start after contraction peak with nadir
         occurring after the peak. Uses Gaussian shape.
-        """
-        if contraction_peaks is None or not np.any(contraction_peaks):
-            return fhr
         
+        The deceleration persists across multiple ticks by storing
+        active decelerations in self._active_decelerations.
+        """
         params: LateDecelerationParams = event.params
         forced_remaining = getattr(event, 'forced_contractions_remaining', None)
         
-        for i, is_peak in enumerate(contraction_peaks):
-            if not is_peak:
-                continue
+        # Schedule new decelerations when contraction peaks are detected
+        if contraction_peaks is not None and np.any(contraction_peaks):
+            for i, is_peak in enumerate(contraction_peaks):
+                if not is_peak:
+                    continue
 
-            if forced_remaining is not None:
-                if forced_remaining <= 0:
-                    continue
-                forced_remaining -= 1
-            else:
-                # Random recurrence based on rate
-                if self._rng.random() > params.recurrence_rate:
-                    continue
+                if forced_remaining is not None:
+                    if forced_remaining <= 0:
+                        continue
+                    forced_remaining -= 1
+                else:
+                    # Random recurrence based on rate
+                    if self._rng.random() > params.recurrence_rate:
+                        continue
+                
+                peak_time = times[i]
+                nadir_time = peak_time + params.lag_seconds
+                sigma = params.recovery_seconds / 2.0
+                # Deceleration ends when Gaussian drops to 1% (~3 sigma)
+                end_time = nadir_time + 3.0 * sigma
+                
+                # Add to active decelerations: ('late', nadir_time, depth, sigma, end_time)
+                self._active_decelerations.append(
+                    ('late', nadir_time, params.depth_bpm, sigma, end_time)
+                )
+        
+        # Apply all active late decelerations
+        for decel_info in self._active_decelerations:
+            if decel_info[0] != 'late':
+                continue
             
-            peak_time = times[i]
-            nadir_time = peak_time + params.lag_seconds
-            
-            # Gaussian shape centered at nadir
-            # Full deceleration spans approximately 2 * recovery_seconds
-            sigma = params.recovery_seconds / 2.0
-            
-            # Calculate deceleration for all samples
+            _, nadir_time, depth_bpm, sigma, end_time = decel_info
             t_rel = times - nadir_time
             decel_shape = np.exp(-0.5 * (t_rel / sigma) ** 2)
             
             # Only apply significant portion of deceleration
             significant_mask = decel_shape > 0.01
-            fhr[significant_mask] -= params.depth_bpm * decel_shape[significant_mask]
+            fhr[significant_mask] -= depth_bpm * decel_shape[significant_mask]
+        
+        # Clean up expired late decelerations
+        if len(times) > 0:
+            current_time = times[-1]
+            self._active_decelerations = [
+                d for d in self._active_decelerations 
+                if not (d[0] == 'late' and d[4] < current_time)
+            ]
         
         if forced_remaining is not None:
             event.forced_contractions_remaining = forced_remaining
@@ -277,67 +300,80 @@ class FHRGenerator:
         
         Variable decelerations have abrupt onset, variable timing,
         and may include severity signs.
-        """
-        if contraction_peaks is None or not np.any(contraction_peaks):
-            return fhr
         
+        The deceleration persists across multiple ticks by storing
+        active decelerations in self._active_decelerations.
+        """
         params: VariableDecelerationParams = event.params
         forced_remaining = getattr(event, 'forced_contractions_remaining', None)
         
-        for i, is_peak in enumerate(contraction_peaks):
-            if not is_peak:
-                continue
+        # Schedule new decelerations when contraction peaks are detected
+        if contraction_peaks is not None and np.any(contraction_peaks):
+            for i, is_peak in enumerate(contraction_peaks):
+                if not is_peak:
+                    continue
 
-            if forced_remaining is not None:
-                if forced_remaining <= 0:
-                    continue
-                forced_remaining -= 1
-            else:
-                if self._rng.random() > params.recurrence_rate:
-                    continue
+                if forced_remaining is not None:
+                    if forced_remaining <= 0:
+                        continue
+                    forced_remaining -= 1
+                else:
+                    if self._rng.random() > params.recurrence_rate:
+                        continue
+                
+                peak_time = times[i]
+                
+                # Variable timing: offset from -10 to +10 seconds around peak
+                offset = self._rng.uniform(-10, 10)
+                decel_start = peak_time + offset
+                duration = params.duration_decel_seconds
+                decel_end = decel_start + duration
+                
+                # Calculate depth
+                depth = params.depth_bpm
+                if params.drops_below_70:
+                    min_depth = self.config.baseline_fhr - 65.0
+                    depth = max(depth, min_depth)
+                
+                # Store variable decel info: (start_time, end_time, depth, duration, params)
+                # Using negative nadir_time to distinguish from late decels
+                self._active_decelerations.append(
+                    ('variable', decel_start, decel_end, depth, duration, params)
+                )
+        
+        # Apply all active variable decelerations
+        for decel_info in self._active_decelerations:
+            if decel_info[0] != 'variable':
+                continue
             
-            peak_time = times[i]
-            
-            # Variable timing: offset from -10 to +10 seconds around peak
-            offset = self._rng.uniform(-10, 10)
-            decel_start = peak_time + offset
-            decel_end = decel_start + params.duration_decel_seconds
+            _, decel_start, decel_end, depth, duration, decel_params = decel_info
             
             decel_mask = (times >= decel_start) & (times <= decel_end)
-            
             if not np.any(decel_mask):
                 continue
             
             t_rel = times[decel_mask] - decel_start
-            duration = params.duration_decel_seconds
             
             # Sharp trapezoid shape (abrupt onset characteristic of variable)
             shape = np.ones_like(t_rel)
             
-            # Fast descent; parameterized to keep variable decels steeper than late decels
-            descent_time = getattr(params, "descent_time_seconds", 5.0)
+            # Fast descent
+            descent_time = getattr(decel_params, "descent_time_seconds", 5.0)
             descent_mask = t_rel < descent_time
             if np.any(descent_mask):
                 shape[descent_mask] = t_rel[descent_mask] / descent_time
             
             # Recovery phase
-            recovery_time = 10.0 if params.slow_recovery else 5.0
+            recovery_time = 10.0 if decel_params.slow_recovery else 5.0
             ascent_start = duration - recovery_time
             ascent_mask = t_rel > ascent_start
             if np.any(ascent_mask):
                 shape[ascent_mask] = (duration - t_rel[ascent_mask]) / recovery_time
             
-            # Calculate depth
-            depth = params.depth_bpm
-            if params.drops_below_70:
-                # Ensure FHR drops below 70
-                min_depth = self.config.baseline_fhr - 65.0
-                depth = max(depth, min_depth)
-            
             fhr[decel_mask] -= depth * shape
             
             # Add overshoot if specified
-            if params.overshoot:
+            if decel_params.overshoot:
                 overshoot_start = decel_end
                 overshoot_end = decel_end + 15.0
                 overshoot_mask = (times >= overshoot_start) & (times <= overshoot_end)
@@ -345,6 +381,14 @@ class FHRGenerator:
                     t_os = times[overshoot_mask] - overshoot_start
                     os_shape = np.exp(-0.5 * (t_os / 5.0) ** 2)
                     fhr[overshoot_mask] += 15.0 * os_shape
+        
+        # Clean up expired variable decelerations
+        if len(times) > 0:
+            current_time = times[-1]
+            self._active_decelerations = [
+                d for d in self._active_decelerations 
+                if not (d[0] == 'variable' and d[2] < current_time - 15.0)  # Keep for overshoot
+            ]
         
         if forced_remaining is not None:
             event.forced_contractions_remaining = forced_remaining
@@ -365,34 +409,54 @@ class FHRGenerator:
         
         Early decelerations are symmetric and coincide with contractions
         (nadir at contraction peak).
-        """
-        if contraction_peaks is None or not np.any(contraction_peaks):
-            return fhr
         
+        The deceleration persists across multiple ticks.
+        """
         params: EarlyDecelerationParams = event.params
         forced_remaining = getattr(event, 'forced_contractions_remaining', None)
         
-        for i, is_peak in enumerate(contraction_peaks):
-            if not is_peak:
-                continue
+        # Schedule new decelerations when contraction peaks are detected
+        if contraction_peaks is not None and np.any(contraction_peaks):
+            for i, is_peak in enumerate(contraction_peaks):
+                if not is_peak:
+                    continue
 
-            if forced_remaining is not None:
-                if forced_remaining <= 0:
-                    continue
-                forced_remaining -= 1
-            else:
-                if self._rng.random() > params.recurrence_rate:
-                    continue
+                if forced_remaining is not None:
+                    if forced_remaining <= 0:
+                        continue
+                    forced_remaining -= 1
+                else:
+                    if self._rng.random() > params.recurrence_rate:
+                        continue
+                
+                peak_time = times[i]
+                sigma = 15.0  # ~30 second duration
+                end_time = peak_time + 3.0 * sigma
+                
+                # Add to active decelerations: ('early', nadir_time, depth, sigma, end_time)
+                self._active_decelerations.append(
+                    ('early', peak_time, params.depth_bpm, sigma, end_time)
+                )
+        
+        # Apply all active early decelerations
+        for decel_info in self._active_decelerations:
+            if decel_info[0] != 'early':
+                continue
             
-            peak_time = times[i]
-            
-            # Symmetric Gaussian centered at peak
-            sigma = 15.0  # ~30 second duration
-            t_rel = times - peak_time
+            _, nadir_time, depth_bpm, sigma, end_time = decel_info
+            t_rel = times - nadir_time
             decel_shape = np.exp(-0.5 * (t_rel / sigma) ** 2)
             
             significant_mask = decel_shape > 0.01
-            fhr[significant_mask] -= params.depth_bpm * decel_shape[significant_mask]
+            fhr[significant_mask] -= depth_bpm * decel_shape[significant_mask]
+        
+        # Clean up expired early decelerations
+        if len(times) > 0:
+            current_time = times[-1]
+            self._active_decelerations = [
+                d for d in self._active_decelerations 
+                if not (d[0] == 'early' and d[4] < current_time)
+            ]
         
         if forced_remaining is not None:
             event.forced_contractions_remaining = forced_remaining

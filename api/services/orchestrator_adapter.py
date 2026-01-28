@@ -280,7 +280,7 @@ class OrchestratorAdapter:
             return {}
     
     def _enhance_with_xgboost(self, data: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
-        """Enhance pipeline result with XGBoost classification and clinical findings."""
+        """Enhance pipeline result with XGBoost classification, findings, and explainability."""
         try:
             import numpy as np
             analyzer = get_trend_analyzer()
@@ -293,13 +293,17 @@ class OrchestratorAdapter:
             if len(fhr_data) < 60:  # Need sufficient data
                 return result
             
-            # Get enhanced analysis
+            # Get enhanced analysis (now includes explanation + highlight_regions)
             analysis = analyzer.analyze(fhr_data, uc_data, baseline, variability)
             
             # Merge into result
             result['confidence'] = analysis.get('confidence', 0.5)
             result['ai_category'] = analysis.get('ml_category', result.get('category', 1))
             result['clinical_overrides'] = analysis.get('clinical_overrides', [])
+            
+            # NEW: Pass through explanation and highlight_regions from ExplanationEngine
+            result['explanation'] = analysis.get('explanation')
+            result['highlight_regions'] = analysis.get('highlight_regions', [])
             
             # Build findings object
             result['findings'] = {

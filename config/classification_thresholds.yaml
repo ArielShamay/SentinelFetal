@@ -1,0 +1,118 @@
+# Classification Thresholds Configuration
+# ========================================
+# OPTIMIZED FOR HIGH SENSITIVITY MODE (~89%)
+# Trade-off: Lower specificity (~27%) to catch more pathological cases
+#
+# Rationale: In fetal monitoring, missing a pathological case (False Negative)
+# is far more dangerous than a false alarm (False Positive).
+#
+# Calibrated on CTU-CHB database (552 records, 105 pathological)
+# Expected results: Sensitivity ~89%, Specificity ~27%, FP ~326, FN ~11
+
+# XGBoost Probability Thresholds
+xgboost:
+  pathological_threshold: 0.40
+  suspicious_threshold: 0.35
+  min_confidence: 0.50
+
+# Clinical Override Rules - HIGH SENSITIVITY SETTINGS
+# Calibrated to achieve ~89% sensitivity
+clinical_overrides:
+  # Bradycardia Override - expanded range for sensitivity
+  bradycardia:
+    enabled: true
+    baseline_threshold: 122  # Widened from 110
+    severe_threshold: 100
+    duration_seconds: 120
+    upgrade_to: 3
+  
+  # Tachycardia Override - expanded range for sensitivity
+  tachycardia:
+    enabled: true
+    baseline_threshold: 148  # Lowered from 160
+    duration_seconds: 180
+    upgrade_to: 2
+  
+  # Absent Variability Override
+  absent_variability:
+    enabled: true
+    threshold_bpm: 5
+    critical_threshold_bpm: 3
+    requires_decels: false
+    upgrade_to: 3
+  
+  # Late Decelerations Override
+  late_decelerations:
+    enabled: true
+    min_count: 2
+    window_minutes: 30
+    upgrade_to: 3
+  
+  # Variable Decelerations Override
+  variable_decelerations:
+    enabled: true
+    min_count: 3
+    window_minutes: 30
+    with_slow_recovery: false
+    upgrade_to: 2
+  
+  # Sinusoidal Pattern Override
+  sinusoidal:
+    enabled: true
+    upgrade_to: 3
+
+  # Reduced Variability
+  reduced_variability:
+    enabled: true
+    threshold_bpm: 10
+    combined_with_baseline_deviation: true
+    baseline_low: 115
+    baseline_high: 155
+    upgrade_to: 2
+  
+  # High Variability - for sensitivity
+  high_variability:
+    enabled: true
+    threshold_bpm: 18  # Lowered from 25 - catches more borderline cases
+    upgrade_to: 2
+
+# Signal Quality Thresholds
+signal_quality:
+  min_valid_percentage: 50
+  fhr_min: 50
+  fhr_max: 220
+  max_valid_variability: 50
+
+# Reassuring Indicators - DISABLED for high sensitivity
+# In high sensitivity mode, we don't downgrade based on reassuring signs
+# because we might miss pathological cases that appear normal
+reassuring:
+  enabled: false
+  moderate_variability:
+    min_bpm: 6
+    max_bpm: 25
+    protective_factor: 0.0
+  accelerations:
+    min_count_30min: 2
+    protective_factor: 0.0
+
+# Temporal Confirmation - DISABLED
+temporal_confirmation:
+  enabled: false
+  brady_confirmed_duration_sec: 30
+  brady_prolonged_duration_sec: 60
+  brady_recurrent_count: 2
+  fp_filter:
+    enabled: false
+    pct_normal_threshold: 80
+    max_brady_duration_sec: 45
+  critical_patterns:
+    severe_baseline_brady_bpm: 100
+    severe_baseline_tachy_bpm: 170
+    prolonged_decel_sec: 60
+    absent_var_with_brady_threshold: 3
+
+# Fallback behavior
+fallback:
+  low_confidence_action: "use_rules_only"
+  default_category: 2

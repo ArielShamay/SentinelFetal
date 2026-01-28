@@ -98,8 +98,14 @@ class MomentAdapter(IFeatureExtractor):
                 "MOMENT not available. Install with: pip install momentfm torch\n"
                 "Or use MiniRocketAdapter instead (recommended)."
             )
-        self._extractor = MomentFeatureExtractor(use_mock=use_mock, device=device)
-        self._use_mock = use_mock or self._extractor.use_mock
+        # Production version: no mock mode support
+        if use_mock:
+            raise ValueError(
+                "MOMENT production version does not support mock mode. "
+                "Use MiniRocketAdapter for testing instead."
+            )
+        self._extractor = MomentFeatureExtractor(device=device)
+        self._use_mock = False
     
     def extract(self, signal: np.ndarray) -> IEmbeddingResult:
         """Extract embeddings using MOMENT."""
@@ -275,18 +281,116 @@ class FusionAdapter(IFeatureFusion):
         variability: IVariabilityResult,
         decelerations: List[IDeceleration],
         tachysystole: ITachysystoleResult,
-        sinusoidal: ISinusoidalResult
+        sinusoidal: ISinusoidalResult,
+        total_contractions: int = 0,
+        v6: bool = True
     ) -> IFeatureVector:
-        """Fuse features using existing implementation."""
-        return build_feature_vector(
-            embedding=embedding,
-            baseline=baseline,
-            variability=variability,
-            decelerations=decelerations,
-            tachysystole=tachysystole,
-            sinusoidal=sinusoidal,
-            start_idx=0,
-            end_idx=0,
-            start_time_sec=0,
-            end_time_sec=0
-        )
+        """Fuse features for V6 pipeline (MiniRocket+clinical, 10,004 dims) or legacy (1,035 dims)."""
+        if v6:
+            # V6 XGBoost was trained with MiniRocket (9,996) + 8 REAL clinical features
+            # The 8 clinical features are:
+            # 1. Baseline / 160
+            # 2. Variability value / 25
+            # 3. Late decel count / 10
+            # 4. Variable decel count / 10
+            # 5. Recurrent decels flag (0/1)
+            # 6. Tachysystole flag (0/1)
+            # 7. Sinusoidal flag (0/1)
+            # 8. Variability category (0-3 normalized to 0-1)
+            from src.models.fusion import V6FeatureVector
+            from src.adapters.xgboost_only_classifier import MINIROCKET_FEATURES, TOTAL_FEATURES
+            import numpy as np
+
+            # 1. MiniRocket embedding (9,996)
+            emb_arr = np.asarray(embedding, dtype=np.float32).ravel()
+            if emb_arr.size != MINIROCKET_FEATURES:
+                raise ValueError(f"MiniRocket embedding must be {MINIROCKET_FEATURES} dims, got {emb_arr.size}")
+
+            # 2. Extract baseline value
+            if hasattr(baseline, 'value'):
+                baseline_value = baseline.value
+            else:
+                baseline_value = float(baseline)
+
+            # 3. Extract variability
+            if hasattr(variability, 'value'):
+                var_value = variability.value
+                var_category = getattr(variability, 'category', None)
+            else:
+                var_value = variability.get('value', 10.0) if isinstance(variability, dict) else 10.0
+                var_category = variability.get('category', 'MODERATE') if isinstance(variability, dict) else 'MODERATE'
+
+            # 4. Count decelerations by type
+            late_count = 0
+            variable_count = 0
+            if decelerations:
+                for d in decelerations:
+                    dtype = getattr(d, 'decel_type', None)
+                    if dtype is not None:
+                        dtype_str = str(dtype.name if hasattr(dtype, 'name') else dtype).upper()
+                        if 'LATE' in dtype_str:
+                            late_count += 1
+                        elif 'VARIABLE' in dtype_str:
+                            variable_count += 1
+
+            # 5. Recurrent decels (>50% of contractions or >3 decels)
+            total_decels = len(decelerations) if decelerations else 0
+            recurrent = total_decels >= 3
+
+            # 6. Tachysystole flag
+            tachy_detected = getattr(tachysystole, 'detected', False) if tachysystole else False
+
+            # 7. Sinusoidal flag
+            sinus_detected = getattr(sinusoidal, 'detected', False) if sinusoidal else False
+
+            # 8. Variability category as number (0-3)
+            category_map = {'ABSENT': 0, 'MINIMAL': 1, 'MODERATE': 2, 'MARKED': 3}
+            if var_category is not None:
+                cat_str = str(var_category.name if hasattr(var_category, 'name') else var_category).upper()
+                var_cat_num = category_map.get(cat_str, 2)  # Default to MODERATE
+            else:
+                var_cat_num = 2  # MODERATE
+
+            # Build the 8 clinical features (normalized)
+            clinical_features = np.array([
+                baseline_value / 160.0,           # 1. Baseline normalized
+                var_value / 25.0,                 # 2. Variability normalized
+                late_count / 10.0,                # 3. Late decel count normalized
+                variable_count / 10.0,            # 4. Variable decel count normalized
+                1.0 if recurrent else 0.0,        # 5. Recurrent decels flag
+                1.0 if tachy_detected else 0.0,   # 6. Tachysystole flag
+                1.0 if sinus_detected else 0.0,   # 7. Sinusoidal flag
+                var_cat_num / 3.0,                # 8. Variability category normalized
+            ], dtype=np.float32)
+
+            # Concatenate: MiniRocket (9,996) + Clinical (8) = 10,004
+            feature_vector = np.concatenate([emb_arr, clinical_features])
+
+            if feature_vector.shape[0] != TOTAL_FEATURES:
+                raise ValueError(f"V6 feature vector must be {TOTAL_FEATURES} dims, got {feature_vector.shape[0]}")
+
+            return V6FeatureVector(
+                vector=feature_vector,
+                baseline=baseline_value,
+                variability_value=var_value,
+                variability_category=str(var_category.name if hasattr(var_category, 'name') else var_category) if var_category else 'MODERATE',
+                late_decel_count=late_count,
+                variable_decel_count=variable_count,
+                recurrent_decels=recurrent,
+                tachysystole=tachy_detected,
+                sinusoidal=sinus_detected,
+            )
+        else:
+            from src.models.fusion import build_feature_vector
+            return build_feature_vector(
+                embedding=embedding,
+                baseline=baseline,
+                variability=variability,
+                decelerations=decelerations,
+                tachysystole=tachysystole,
+                sinusoidal=sinusoidal,
+                start_idx=0,
+                end_idx=0,
+                start_time_sec=0,
+                end_time_sec=0
+            )

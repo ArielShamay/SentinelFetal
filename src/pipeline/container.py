@@ -46,6 +46,7 @@ from src.adapters import (
     TachysystoleAdapter,
     SinusoidalAdapter,
     MomentAdapter,
+    MiniRocketAdapter,
     FusionAdapter,
     ClassifierAdapter,
     OverrideAdapter,
@@ -148,7 +149,7 @@ class PipelineContainer:
             sinusoidal_detector=SinusoidalAdapter(),
             
             # Model layer
-            feature_extractor=MomentAdapter(use_mock=use_mock_moment),
+            feature_extractor=MiniRocketAdapter() if use_mock_moment else MomentAdapter(),
             feature_fusion=FusionAdapter(),
             classifier=classifier,
             

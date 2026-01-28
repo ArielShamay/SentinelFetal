@@ -37,12 +37,13 @@ logger = logging.getLogger(__name__)
 
 class OverrideReason(Enum):
     """Reasons for medical override."""
-    
+
     NONE = auto()
     SINUSOIDAL_PATTERN = auto()
     ABSENT_VARIABILITY_WITH_DECELS = auto()
     BRADYCARDIA = auto()
     RECURRENT_LATE_DECELS = auto()
+    RECURRENT_VARIABLE_DECELS = auto()  # Added for V6
     ABSENT_VARIABILITY_SAFETY_FLOOR = auto()
 
 
@@ -94,20 +95,48 @@ def _has_recurrent_late_decels(decelerations: List[Deceleration]) -> bool:
 def _has_recurrent_variable_decels(decelerations: List[Deceleration]) -> bool:
     """
     Check for recurrent variable decelerations.
-    
-    Recurrent = appearing in ≥50% of contractions over a 20-minute period.
-    Simplified: ≥3 variable decelerations in the list.
-    
+
+    Recurrent = ≥3 variable decelerations in the analysis window.
+
     Args:
         decelerations: List of detected decelerations.
-        
+
     Returns:
         True if recurrent variable decelerations are present.
     """
-    variable_count = sum(1 for d in decelerations 
+    variable_count = sum(1 for d in decelerations
                          if d.decel_type == DecelerationType.VARIABLE or
                          (isinstance(d.decel_type, str) and d.decel_type.lower() == 'variable'))
     return variable_count >= 3
+
+
+def _has_concerning_variable_decels(decelerations: List[Deceleration]) -> bool:
+    """
+    Check for CONCERNING variable decelerations (deep or prolonged).
+
+    Concerning = at least 2 variable decelerations that are either:
+    - Deep: >35 bpm below baseline
+    - Prolonged: >30 seconds duration
+
+    Args:
+        decelerations: List of detected decelerations.
+
+    Returns:
+        True if concerning variable decelerations are present.
+    """
+    concerning_count = 0
+    for d in decelerations:
+        is_variable = (
+            d.decel_type == DecelerationType.VARIABLE or
+            (isinstance(d.decel_type, str) and d.decel_type.lower() == 'variable')
+        )
+        if is_variable:
+            is_deep = hasattr(d, 'depth') and d.depth > 35
+            is_prolonged = hasattr(d, 'duration_seconds') and d.duration_seconds > 30
+            if is_deep or is_prolonged:
+                concerning_count += 1
+
+    return concerning_count >= 2
 
 
 def _detect_bradycardia(baseline: BaselineResult) -> bool:
@@ -222,7 +251,23 @@ def apply_medical_override(
                 "Classification elevated to Category 2 to reflect increased risk."
             )
         )
-    
+
+    # Concerning variable decelerations (deep or prolonged) elevate to Category 2.
+    # Per FIGO guidelines, variable decelerations that are deep (>35 bpm) or
+    # prolonged (>30 seconds) warrant clinical attention.
+    if _has_concerning_variable_decels(decelerations):
+        logger.warning("MEDICAL OVERRIDE: Concerning variable decelerations → Category 2")
+        return MedicalOverride(
+            should_override=True,
+            final_category=1,
+            reason=OverrideReason.RECURRENT_VARIABLE_DECELS,
+            ml_prediction=ml_prediction,
+            explanation=(
+                "Concerning variable decelerations detected (≥2 deep or prolonged events). "
+                "Classification elevated to Category 2 to reflect increased risk."
+            )
+        )
+
     # ==========================================================================
     # RULE 2: Absent Variability + Ominous Signs → Force Category 3
     # ==========================================================================
