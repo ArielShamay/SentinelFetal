@@ -28,7 +28,8 @@ const wsUpdateToSnapshot = (update: WSPatientUpdate): PatientSnapshot => {
     timestamps: [],
     alerts: [],
     trend_data: null,
-    explanation: null,
+    explanation: update.explanation ?? null,
+    highlight_regions: update.highlight_regions,
     fsqi_score: update.fsqi,
     has_active_event: false,
     last_update: Date.now(),
@@ -37,6 +38,7 @@ const wsUpdateToSnapshot = (update: WSPatientUpdate): PatientSnapshot => {
 
 export const WardView: React.FC = () => {
   const liveUpdates = usePatientStore(state => state.liveUpdates)
+  const connected = usePatientStore(state => state.connected)
   const gridColumns = useUIStore(state => state.gridColumns)
   const setGridColumns = useUIStore(state => state.setGridColumns)
 
@@ -106,11 +108,6 @@ export const WardView: React.FC = () => {
 
   return (
     <div className="p-4 bg-gray-50 min-h-screen">
-      {/* DEBUG INFO */}
-      <div id="debug-info" className="mb-2 p-2 bg-yellow-100 border border-yellow-400 text-sm font-mono">
-        Patients in store: {liveUpdates.size} | Sorted: {sortedPatients.length}
-      </div>
-      
       {/* Toolbar */}
       <div className="mb-6 flex flex-wrap items-center gap-4 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
         {/* Search */}
@@ -127,7 +124,7 @@ export const WardView: React.FC = () => {
               onClick={() => setSearchQuery('')}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
-              ✕
+              x
             </button>
           )}
         </div>
@@ -196,6 +193,12 @@ export const WardView: React.FC = () => {
             </button>
           ))}
         </div>
+
+        {/* Connection indicator */}
+        <div className="flex items-center gap-2 ml-auto">
+          <div className={`w-2.5 h-2.5 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span className="text-xs text-gray-500">{connected ? 'Live' : 'Disconnected'}</span>
+        </div>
       </div>
 
       {/* Patient Grid */}
@@ -223,6 +226,7 @@ export const WardView: React.FC = () => {
         </div>
       ) : (
         <EmptyState
+          connected={connected}
           hasFilter={filterMode !== 'all' || !!searchQuery}
           onClear={() => { setFilterMode('all'); setSearchQuery('') }}
         />
@@ -272,13 +276,16 @@ const FilterButton: React.FC<FilterButtonProps> = ({
 }
 
 // Empty state component
-const EmptyState: React.FC<{ hasFilter: boolean; onClear: () => void }> = ({
+const EmptyState: React.FC<{ connected: boolean; hasFilter: boolean; onClear: () => void }> = ({
+  connected,
   hasFilter,
   onClear
 }) => (
   <div className="flex flex-col items-center justify-center py-20 bg-white rounded-lg shadow-sm border border-gray-200">
-    <div className="text-6xl mb-4">🏥</div>
-    <h3 className="text-xl font-medium text-gray-900 mb-2">No patients found</h3>
+    <div className="text-6xl mb-4">{connected ? '⏳' : '🔌'}</div>
+    <h3 className="text-xl font-medium text-gray-900 mb-2">
+      {hasFilter ? 'No patients match' : connected ? 'Waiting for data...' : 'Not connected'}
+    </h3>
     {hasFilter ? (
       <>
         <p className="text-sm text-gray-500 mb-4">No patients match your current filters</p>
@@ -290,7 +297,9 @@ const EmptyState: React.FC<{ hasFilter: boolean; onClear: () => void }> = ({
         </button>
       </>
     ) : (
-      <p className="text-sm text-gray-500">Start the simulation to see patient data</p>
+      <p className="text-sm text-gray-500">
+        {connected ? 'The simulation is starting, data will appear shortly' : 'Start the simulation to see patient data'}
+      </p>
     )}
   </div>
 )

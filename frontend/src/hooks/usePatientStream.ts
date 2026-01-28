@@ -7,19 +7,39 @@ export function usePatientStream() {
   const updateFromWebSocket = usePatientStore((s) => s.updateFromWebSocket)
   const setConnected = usePatientStore((s) => s.setConnected)
   const incrementTickCount = usePatientStore((s) => s.incrementTickCount)
+  const setSimulationState = usePatientStore((s) => s.setSimulationState)
   const initialized = useRef(false)
+  const simulationSynced = useRef(false)
+
+  // Store callbacks in refs to avoid stale closure issues
+  const updateFromWebSocketRef = useRef(updateFromWebSocket)
+  const setConnectedRef = useRef(setConnected)
+  const incrementTickCountRef = useRef(incrementTickCount)
+  const setSimulationStateRef = useRef(setSimulationState)
+
+  // Keep refs updated
+  useEffect(() => {
+    updateFromWebSocketRef.current = updateFromWebSocket
+    setConnectedRef.current = setConnected
+    incrementTickCountRef.current = incrementTickCount
+    setSimulationStateRef.current = setSimulationState
+  }, [updateFromWebSocket, setConnected, incrementTickCount, setSimulationState])
 
   const handleMessage = useCallback(
     (message: WSMessage) => {
-      console.log('🎯 handleMessage:', message.type, message)
       if (message.type === 'connected') {
-        setConnected(true, message.client_id)
+        setConnectedRef.current(true, message.client_id)
       } else if (message.type === 'patient_update') {
-        console.log('📊 Patient update - patients:', message.patients?.length, 'single:', message.patient_id)
+        // Receiving patient data means the simulation is running
+        if (!simulationSynced.current) {
+          simulationSynced.current = true
+          setSimulationStateRef.current(true, false)
+        }
+
         // Handle batch update
         if (message.patients) {
           for (const patient of message.patients) {
-            updateFromWebSocket(patient)
+            updateFromWebSocketRef.current(patient)
           }
         }
         // Handle single patient update - extract WSPatientUpdate fields from message
@@ -37,21 +57,22 @@ export function usePatientStream() {
             mhr_alert: message.mhr_alert as MHRAlert | null | undefined,
             trend_score: message.trend_score as number | undefined,
             trend_slope: message.trend_slope as number | undefined,
+            explanation: message.explanation as WSPatientUpdate['explanation'],
+            highlight_regions: message.highlight_regions as WSPatientUpdate['highlight_regions'],
           }
-          console.log('📌 Extracted patient update:', patientUpdate)
-          updateFromWebSocket(patientUpdate)
+          updateFromWebSocketRef.current(patientUpdate)
         }
-        incrementTickCount()
+        incrementTickCountRef.current()
       }
     },
-    [updateFromWebSocket, setConnected, incrementTickCount]
+    [] // No dependencies - uses refs
   )
 
   const handleStatus = useCallback(
     (connected: boolean) => {
-      setConnected(connected)
+      setConnectedRef.current(connected)
     },
-    [setConnected]
+    [] // No dependencies - uses ref
   )
 
   const connect = useCallback(() => {
@@ -66,8 +87,8 @@ export function usePatientStream() {
   const disconnect = useCallback(() => {
     wsManager.disconnect()
     initialized.current = false
-    setConnected(false)
-  }, [setConnected])
+    setConnectedRef.current(false)
+  }, [])
 
   const subscribe = useCallback((patientIds: string[]) => {
     wsManager.subscribe(patientIds)

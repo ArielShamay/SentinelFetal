@@ -27,7 +27,7 @@ interface BaselineFindings {
   is_stable: boolean
 }
 
-interface ClinicalFindings {
+export interface ClinicalFindings {
   decelerations: DecelerationFindings
   variability: VariabilityFindings
   baseline: BaselineFindings

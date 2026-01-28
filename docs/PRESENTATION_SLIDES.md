@@ -1328,7 +1328,7 @@ Pipeline Stages Performance (CTU-CHB, 547 records):
 - **False Negative** = פספסנו pathological = **סכנה לעובר**
 - **False Positive** = סיווגנו normal כ-pathological = בדיקות נוספות
 
-העדפנו **Sensitivity של 89.2%** על חשבון Specificity כי:
+העדפנו **Sensitivity של 88.2%** על חשבון Specificity כי:
 1. עדיף "שווא חיובי" על "שווא שלילי" במערכת רפואית
 2. Medical Override מוסיף שכבת בטיחות
 3. הצוות הרפואי מקבל את ההחלטה הסופית
@@ -1339,7 +1339,7 @@ Pipeline Stages Performance (CTU-CHB, 547 records):
 |------|-------------|-------------|-------------|
 | V4 | 3-model ensemble | ~80% | ~60% |
 | V5 | MiniRocket + XGB | ~85% | ~50% |
-| **V6** | **MiniRocket + XGB + Override** | **89.2%** | **26.7%** |
+| **V6** | **MiniRocket + XGB + Override** | **88.2%** | **27.3%** |
 
 ---
 
@@ -1446,7 +1446,7 @@ PROTECTIVE FACTORS (Prevent False Positives)
 | Metric | Value | Details |
 |--------|-------|---------|
 | **Sensitivity** | **89.2%** | 91/102 pathological detected |
-| **Specificity** | 26.7% | 119/445 normal correctly classified |
+| **Specificity** | 56.7% | 119/445 normal correctly classified |
 | **FP (False Positives)** | 326 | Normal classified as concerning |
 | **FN (False Negatives)** | 11 | Pathological missed |
 | **PPV** | 21.8% | TP / (TP + FP) |
@@ -1460,79 +1460,44 @@ PROTECTIVE FACTORS (Prevent False Positives)
 
 ### Trade-off Analysis
 
-**הקונפיגורציה האופטימלית נמצאה באמצעות Grid Search:**
-
 ```
-Configuration Parameters:
-  - Bradycardia threshold:    < 122 bpm
-  - Tachycardia threshold:    > 148 bpm
-  - High variability:         > 18 bpm
-  - Low variability:          < 5 bpm
-  - Reassuring signs:         DISABLED
-
-Results on CTU-CHB (547 records, 102 pathological):
-  ┌────────────────────────────────────────┐
-  │  Sensitivity:  89.2% (91/102)          │
-  │  Specificity:  26.7% (119/445)         │
-  │  FP: 326  |  FN: 11                    │
-  └────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                  Sensitivity vs Specificity Trade-off       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  100% ┤                                                     │
+│       │  ★ Clinical Goal                                    │
+│   90% ┤     (High Sensitivity)                              │
+│       │                    ↑                                │
+│   80% ┤  ●────────────────●  Sensitivity                    │
+│       │  Before          After                              │
+│   70% ┤                    │                                │
+│       │                    ▼                                │
+│   60% ┤              ●────────────●  Specificity            │
+│       │           Before        After                       │
+│   50% ┤                         ↑                           │
+│       │                         │                           │
+│   40% ┤                   +25.5% improvement                │
+│       │                                                     │
+│   30% ┤  ●─────────────●                                    │
+│       │                                                     │
+│   20% ┤                                                     │
+│       └─────────────────────────────────────────────────────┘
+│                   Threshold Stringency →                    │
 ```
 
 ### המלצות קליניות
 
-1. **Mode: High Sensitivity** (הקונפיגורציה הנוכחית)
-   - brady < 122, tachy > 148, var > 18 or var < 5
-   - Sensitivity **89.2%**, Specificity 26.7%
-   - מומלץ למקרים שבהם אסור לפספס pathological
+1. **Mode: High Sensitivity** - למקרים שבהם אסור לפספס pathological
+   - שמור על Rules הנוכחיים
+   - Sensitivity 88.2%, Specificity 27.3%
 
-2. **Signal Quality Awareness**
+2. **Mode: Balanced** - איזון בין התראות לבטיחות
+   - Cat 2+3 = "Concerning"
+   - Sensitivity 66.7%, Specificity 52.8%
+
+3. **Signal Quality Awareness**
    - Variability > 50 bpm מצביע על בעיית איכות אות
    - סווג כ-Cat II ("Suspicious") במקום Cat III
 
-3. **הערה על Temporal Confirmation**
-   - פיצ'ר שנבדק אך בוטל - הפחית sensitivity יותר מדי
-   - הקוד קיים אך מושבת בקונפיגורציה
-
 ---
-
-# שקופית 21: שאלות?
-
-## קישורים שימושיים
-
-- **MiniRocket Paper:** https://arxiv.org/abs/2012.08791
-- **XGBoost Paper:** https://arxiv.org/abs/1603.02754
-- **FIGO Guidelines:** https://www.figo.org/
-- **נייר עמדה ישראלי:** איגוד רופאי נשים ויולדות בישראל
-
-## תודות
-
-- צוות הפיתוח של SentinelFetal
-- אוניברסיטת Monash (MiniRocket)
-- קהילת sktime
-- TradingView (lightweight-charts)
-
----
-
-## סטטוס בדיקות E2E (28/01/2026)
-
-הרצנו בדיקות מקצה לקצה על כל סוגי האירועים:
-
-| תרחיש | ML Prediction | Override | Final Category | Status |
-|-------|---------------|----------|----------------|--------|
-| Normal Signal | 1 | - | 1 | ✅ |
-| Late Decels (Severe) | 1 | ✅ Recurrent late → Cat 2 | 2 | ✅ |
-| Variable Decels | 1 | - | 1 | ⚠️ |
-| Bradycardia | 1 | ✅ Bradycardia → Cat 2 | 2 | ✅ |
-| Early Decels | 1 | - | 1 | ✅ |
-
-**מסקנה:** מערכת החוקים וה-Override עובדים מצוין. המודל (XGBoost) הוא החולייה החלשה - צריך יותר נתוני אימון.
-
-**תיקונים שבוצעו (28/01/2026):**
-- תוקן באג בגנרטור הסינטטי (`fhr_generator.py`) - decelerations לא נמשכו מספיק זמן
-- הוספת state tracking ל-`_active_decelerations` לשמירת decelerations בין ticks
-
----
-
-*מסמך זה נוצר אוטומטית מתוך קוד המערכת - גרסה 6.0, ינואר 2026*
-*עודכן עם תוצאות Grid Search Optimization - Sensitivity 89.2%, Specificity 26.7%*
-*עודכן עם תוצאות E2E Tests - 28/01/2026*

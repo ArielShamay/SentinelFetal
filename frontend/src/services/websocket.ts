@@ -21,13 +21,13 @@ class WebSocketManager {
   private shouldReconnect = true
 
   constructor(url?: string) {
-    // Connect directly to backend on port 8001
-    this.url = url || 'ws://localhost:8001/ws/stream'
+    // Use relative URL so Vite proxy handles it in dev, and works in production too
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    this.url = url || `${wsProtocol}//${window.location.host}/ws/stream`
   }
 
   connect(): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket already connected')
       return
     }
 
@@ -37,72 +37,63 @@ class WebSocketManager {
       ? `${this.url}?client_id=${this.clientId}&format=json`
       : `${this.url}?format=json`
 
-    console.log('Connecting to WebSocket:', urlWithParams)
-    
+    console.log('[WS] Connecting to:', urlWithParams)
+
     this.ws = new WebSocket(urlWithParams)
 
     this.ws.onopen = () => {
-      console.log('WebSocket connected')
+      console.log('[WS] Connected')
       this.reconnectAttempts = 0
       this.statusHandler?.(true)
     }
 
     this.ws.onmessage = (event) => {
       try {
-        // DEBUG: Check what we received
-        console.log('📥 WebSocket raw data:', typeof event.data, event.data instanceof Blob ? 'Blob' : event.data instanceof ArrayBuffer ? 'ArrayBuffer' : 'string')
-        
         let data: WSMessage
-        
+
         // Handle binary data (Blob or ArrayBuffer)
         if (event.data instanceof Blob) {
-          // Convert Blob to text
           event.data.text().then(text => {
             try {
               data = JSON.parse(text) as WSMessage
-              console.log('📥 WebSocket message (from Blob):', data.type, data)
               this.processMessage(data)
             } catch (error) {
-              console.error('Failed to parse Blob data:', error)
+              console.error('[WS] Failed to parse Blob data:', error)
             }
           })
           return
         } else if (event.data instanceof ArrayBuffer) {
-          // Convert ArrayBuffer to text
           const decoder = new TextDecoder()
           const text = decoder.decode(event.data)
           data = JSON.parse(text) as WSMessage
-          console.log('📥 WebSocket message (from ArrayBuffer):', data.type, data)
         } else {
-          // Plain text
           data = JSON.parse(event.data) as WSMessage
-          console.log('📥 WebSocket message (from text):', data.type, data)
         }
 
         this.processMessage(data)
       } catch (error) {
-        console.error('Failed to parse WebSocket message:', error)
+        console.error('[WS] Failed to parse message:', error)
       }
     }
 
     this.ws.onclose = (event) => {
-      console.log('WebSocket disconnected:', event.code, event.reason)
+      console.log('[WS] Disconnected:', event.code, event.reason)
       this.statusHandler?.(false)
-      
+
       if (this.shouldReconnect) {
         this.attemptReconnect()
       }
     }
 
     this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
+      console.error('[WS] Error:', error)
     }
   }
 
   private processMessage(data: WSMessage): void {
     // Handle connection message
     if (data.type === 'connected' && data.client_id) {
-      console.log('Assigned client ID:', data.client_id)
+      console.log('[WS] Assigned client ID:', data.client_id)
       this.clientId = data.client_id
     }
 
@@ -113,7 +104,9 @@ class WebSocketManager {
     }
 
     // Forward to handler
-    this.messageHandler?.(data)
+    if (this.messageHandler) {
+      this.messageHandler(data)
+    }
   }
 
   disconnect(): void {
@@ -126,7 +119,7 @@ class WebSocketManager {
 
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('Max reconnect attempts reached')
+      console.log('[WS] Max reconnect attempts reached')
       return
     }
 
@@ -136,7 +129,7 @@ class WebSocketManager {
       30000 // Max 30 seconds
     )
 
-    console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
+    console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
 
     setTimeout(() => {
       if (this.shouldReconnect) {

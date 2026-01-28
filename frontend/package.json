@@ -20,6 +20,7 @@
     "@tanstack/react-query": "^5.17.0",
     "i18next": "^23.16.8",
     "lightweight-charts": "^4.1.0",
+    "lucide-react": "^0.563.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.6.0",

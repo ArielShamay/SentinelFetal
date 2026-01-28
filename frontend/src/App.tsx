@@ -8,7 +8,7 @@ import './i18n'
 
 import { Layout } from './components/layout'
 import { WardView, DetailView } from './pages'
-import { usePatientStream } from './hooks'
+import { usePatientStream, useSimulation } from './hooks'
 
 // Create React Query client with sensible defaults
 const queryClient = new QueryClient({
@@ -24,16 +24,30 @@ const queryClient = new QueryClient({
 // WebSocket connection wrapper component
 function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const { connect, disconnect } = usePatientStream()
+  const { start, fetchStatus } = useSimulation()
   
   useEffect(() => {
     // Connect to WebSocket when app mounts
     connect()
     
+    // Auto-start simulation after connecting
+    const autoStart = async () => {
+      const status = await fetchStatus()
+      if (status && !status.running) {
+        console.log('🚀 Auto-starting simulation...')
+        await start()
+      }
+    }
+    
+    // Small delay to ensure WebSocket is connected first
+    const timer = setTimeout(autoStart, 500)
+    
     // Disconnect when app unmounts
     return () => {
+      clearTimeout(timer)
       disconnect()
     }
-  }, [connect, disconnect])
+  }, [connect, disconnect, start, fetchStatus])
   
   return <>{children}</>
 }

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .patient-card { border: 1px solid #ccc; padding: 15px; margin: 10px; border-radius: 8px; }
+        .cat-1 { border-left: 4px solid green; }
+        .cat-2 { border-left: 4px solid yellow; background: #fffde7; }
+        .cat-3 { border-left: 4px solid red; background: #ffebee; }
+        h2 { margin: 0 0 10px 0; }
+        pre { background: #f5f5f5; padding: 10px; overflow: auto; max-height: 200px; }
+    </style>
+</head>
+<body>
+    <h1>SentinelFetal API Test</h1>
+    <div id="status">Loading...</div>
+    <div id="patients"></div>
+
+    <script>
+        async function loadPatients() {
+            const statusEl = document.getElementById('status');
+            const patientsEl = document.getElementById('patients');
+            
+            statusEl.textContent = 'Fetching patients...';
+            patientsEl.innerHTML = '';
+            
+            for (const id of ['P1', 'P2', 'P3', 'P4']) {
+                try {
+                    const response = await fetch(`http://localhost:8000/api/patients/${id}`);
+                    if (response.ok) {
+                        const patient = await response.json();
+                        
+                        const card = document.createElement('div');
+                        card.className = `patient-card cat-${patient.category}`;
+                        card.innerHTML = `
+                            <h2>${patient.patient_id} - ${patient.category_name}</h2>
+                            <p><strong>Category:</strong> ${patient.category}</p>
+                            <p><strong>Baseline FHR:</strong> ${patient.metrics.baseline_fhr.toFixed(1)} bpm</p>
+                            <p><strong>Current FHR:</strong> ${patient.metrics.current_fhr.toFixed(1)} bpm</p>
+                            <p><strong>Variability:</strong> ${patient.metrics.variability.toFixed(1)} bpm</p>
+                            <p><strong>Primary Reason:</strong> ${patient.explanation?.primary_reason || 'N/A'}</p>
+                            <p><strong>Recommendation:</strong> ${patient.explanation?.recommendation || 'N/A'}</p>
+                            <p><strong>FHR Data Points:</strong> ${patient.fhr_history?.length || 0}</p>
+                        `;
+                        patientsEl.appendChild(card);
+                    } else {
+                        patientsEl.innerHTML += `<p>Failed to load ${id}: ${response.status}</p>`;
+                    }
+                } catch (error) {
+                    patientsEl.innerHTML += `<p>Error loading ${id}: ${error.message}</p>`;
+                }
+            }
+            
+            statusEl.textContent = 'Loaded ' + document.querySelectorAll('.patient-card').length + ' patients';
+        }
+        
+        loadPatients();
+        
+        // Refresh every 5 seconds
+        setInterval(loadPatients, 5000);
+    </script>
+</body>
+</html>

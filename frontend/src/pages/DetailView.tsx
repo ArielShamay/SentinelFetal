@@ -2,10 +2,10 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePatientStore } from '../stores'
 import { CategoryBadge, CTGChart, ChartControls, TrendPanel, ExplanationPanel } from '../components'
-import { FindingsPanel } from '../components/panels/FindingsPanel'
+import { FindingsPanel, type ClinicalFindings } from '../components/panels/FindingsPanel'
 import { api } from '../services'
 import type { PatientSnapshot, Alert, WSPatientUpdate } from '../types'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Activity } from 'lucide-react'
 
 export const DetailView: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>()
@@ -216,8 +216,8 @@ export const DetailView: React.FC = () => {
                 confidence: (currentData.explanation ?? liveUpdate?.explanation)?.confidence ?? 0,
               } : undefined}
             />
-            {liveUpdate?.findings && (
-              <FindingsPanel findings={liveUpdate.findings} />
+            {liveUpdate?.findings && 'decelerations' in liveUpdate.findings && (
+              <FindingsPanel findings={liveUpdate.findings as unknown as ClinicalFindings} />
             )}
             <EventsPanel alerts={currentData.alerts ?? []} />
             <AlertsPanel patient={currentData} />
