@@ -84,3 +84,8 @@ npm-debug.log*
 # Profiling
 *.prof
 profile_output.prof
+
+# Test artifacts
+models/ensemble_v5/xgboost_v5.pkl
+REPORTS/*.json
+
