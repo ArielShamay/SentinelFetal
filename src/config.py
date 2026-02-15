@@ -100,6 +100,9 @@ class ClinicalThresholds:
 THRESHOLDS: Final[ClinicalThresholds] = ClinicalThresholds()
 
 
+
+
+
 # =============================================================================
 # UI Colors
 # =============================================================================
@@ -230,6 +233,72 @@ HEBREW: Final[HebrewStrings] = HebrewStrings()
 
 
 # =============================================================================
+# Dynamic Thresholds (Stage 4)
+# =============================================================================
+
+@dataclass(frozen=True)
+class DynamicThresholds:
+    """Dynamic AI score thresholds (loaded from YAML or defaults)."""
+    
+    # Stage 4: AI thresholds
+    t_low: float = 0.45
+    t_high: float = 0.72
+    
+    # Stage 4: Persistence
+    K: int = 2
+    N: int = 3
+    
+    # Stage 5: Rule score minimum for Tier-2
+    r_min: float = 0.3
+
+
+def load_dynamic_thresholds(yaml_path: str = 'models/thresholds.yaml') -> DynamicThresholds:
+    """
+    Load dynamic thresholds from YAML file.
+    
+    Args:
+        yaml_path: Path to thresholds YAML file.
+        
+    Returns:
+        DynamicThresholds instance with loaded or default values.
+    """
+    from pathlib import Path
+    import yaml
+    
+    path = Path(yaml_path)
+    
+    if not path.exists():
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            f"Thresholds file not found at {yaml_path}, using defaults. "
+            f"Run stage4_calibrate.py to generate calibrated thresholds."
+        )
+        return DynamicThresholds()
+    
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        
+        # Get tiering config with fallback to default
+        tiering = config.get('tiering', {})
+        
+        return DynamicThresholds(
+            t_low=config['thresholds']['t_low'],
+            t_high=config['thresholds']['t_high'],
+            K=config['persistence']['K'],
+            N=config['persistence']['N'],
+            r_min=tiering.get('r_min', 0.3)
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to load thresholds from {yaml_path}: {e}")
+        logger.warning("Falling back to default thresholds")
+        return DynamicThresholds()
+
+
+# =============================================================================
 # Convenience Exports
 # =============================================================================
 
@@ -240,6 +309,8 @@ __all__ = [
     'MODEL',
     'PATHS',
     'HEBREW',
+    'DynamicThresholds',
+    'load_dynamic_thresholds',
     'CTGConfig',
     'ClinicalThresholds',
     'UIColors',

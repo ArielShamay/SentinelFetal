@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { wsManager } from '../services/websocket'
 import { usePatientStore } from '../stores/patientStore'
-import type { WSMessage, WSPatientUpdate, MHRAlert } from '../types'
+import type { WSMessage, WSPatientUpdate, MHRAlert, ClinicalFindings } from '../types'
 
 export function usePatientStream() {
   const updateFromWebSocket = usePatientStore((s) => s.updateFromWebSocket)
@@ -33,7 +33,7 @@ export function usePatientStream() {
             uc_latest: message.uc_latest as number[],
             fsqi: message.fsqi as number,
             confidence: message.confidence as number,
-            findings: message.findings as Record<string, unknown>,
+            findings: message.findings as ClinicalFindings,
             mhr_alert: message.mhr_alert as MHRAlert | null | undefined,
             trend_score: message.trend_score as number | undefined,
             trend_slope: message.trend_slope as number | undefined,

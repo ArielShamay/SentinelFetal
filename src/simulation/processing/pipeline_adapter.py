@@ -42,7 +42,7 @@ from src.rules.sinusoidal import detect_sinusoidal_pattern
 from src.models.minirocket_encoder import MiniRocketEncoder, MiniRocketEncoderError
 from src.models.fusion import build_feature_vector
 from src.models.classifier import XGBClassifierWrapper
-from src.analysis.override import apply_medical_override
+from src.analysis.override import apply_medical_override, calculate_rule_score
 from src.analysis.alerts import generate_alert
 
 # V2.0 imports
@@ -50,6 +50,10 @@ from src.safety import MHRDetector, MHRDetectorConfig, MHRAction, MHRCheckResult
 from src.analysis.trend_buffer import TrendBuffer, TrendDataPoint
 from src.analysis.trend_analyzer import TrendAnalyzer, TrendAnalysisResult
 from src.explainability import ExplanationEngine, ExplanationResult
+
+# Stage 5 Imports
+from src.pipeline.stage5_hybrid import Stage5Pipeline
+from src.analysis.tiering import Tier
 
 
 logger = logging.getLogger(__name__)
@@ -193,6 +197,10 @@ class PipelineAdapter:
         self._process_count = 0
         self._mhr_blocks = 0
         self._trend_overrides = 0
+        
+        # Stage 5 Pipeline (Hybrid Decision)
+        self._stage5_pipeline = Stage5Pipeline()
+        logger.info("Stage 5 Hybrid Pipeline initialized")
     
     def process_patient(
         self,
@@ -415,111 +423,56 @@ class PipelineAdapter:
                 confidence = 0.7
 
             # ================================================================
-            # Step 6: Medical Override (Safety Net)
+            # Step 6: Hybrid Decision (Stage 5)
             # ================================================================
-            override_result = apply_medical_override(
-                ml_prediction=ml_prediction,
-                baseline=baseline_result,
-                variability=variability_result,
-                decelerations=decelerations,
-                tachysystole=tachysystole_result,
-                sinusoidal=sinusoidal_result
+            
+            # Calculate rule score for Stage 5
+            rule_result = calculate_rule_score(
+                baseline_result,
+                variability_result,
+                decelerations,
+                tachysystole_result,
+                sinusoidal_result
             )
 
-            # Convert from 0-indexed to 1-indexed category
-            final_category = override_result.final_category + 1
-
-            # ================================================================
-            # Step 7: Generate Alert
-            # ================================================================
-            alert = generate_alert(
-                category=final_category,
-                confidence=confidence,
-                baseline=baseline_result,
-                variability=variability_result,
-                decelerations=decelerations,
-                tachysystole=tachysystole_result,
-                sinusoidal=sinusoidal_result
+            # Process through Stage 5 Pipeline
+            # Note: We use confidence as ai_score
+            decision = self._stage5_pipeline.process_window(
+                record_id=patient_id,
+                window_index=self._process_count,
+                window_start=time.time(), # Real-time simulation
+                window_end=time.time(),
+                quality_class="GOOD", # Passed gate
+                ai_score=confidence,
+                rule_score=rule_result.score,
+                rule_hits=rule_result.rule_hits,
+                is_severe=rule_result.is_severe
             )
 
-            # ================================================================
-            # Step 8: Trend Analysis (V2.0)
-            # ================================================================
-            if self._trend_analyzer is not None:
-                # Initialize trend buffer for new patients
-                if patient_id not in self._trend_buffers:
-                    self._trend_buffers[patient_id] = TrendBuffer(
-                        max_minutes=60,
-                        sample_interval_minutes=2
-                    )
-
-                trend_buffer = self._trend_buffers[patient_id]
-                current_time = time.time()
-
-                # Sample trend data every 2 minutes
-                if trend_buffer.should_sample(current_time):
-                    # Count late decels for this sample
-                    late_decel_count = sum(
-                        1 for d in decelerations
-                        if hasattr(d.decel_type, 'name') and d.decel_type.name == 'LATE'
-                    )
-                    var_decel_count = sum(
-                        1 for d in decelerations
-                        if hasattr(d.decel_type, 'name') and d.decel_type.name == 'VARIABLE'
-                    )
-
-                    # Add sample (FSQI masking happens inside TrendBuffer)
-                    trend_buffer.add_sample(TrendDataPoint(
-                        timestamp=current_time,
-                        variability=variability_result.value,
-                        baseline=baseline_result.value,
-                        decel_count_15min=late_decel_count + var_decel_count,
-                        has_late_decel=(late_decel_count > 0),
-                        has_variable_decel=(var_decel_count > 0),
-                        category=final_category,
-                        fsqi_score=quality_result.score
-                    ))
-
-                # Analyze trends
-                trend_result = self._trend_analyzer.analyze(trend_buffer)
-
-                # Optional: Override category based on deterioration
-                if (trend_result.deterioration_score > 70 and
-                    final_category == 1 and
-                    not override_result.should_override):
-                    final_category = 2
-                    was_trend_overridden = True
-                    self._trend_overrides += 1
-                    logger.info(
-                        f"Patient {patient_id}: Category upgraded 1→2 due to "
-                        f"deterioration score {trend_result.deterioration_score}"
-                    )
-
-            # ================================================================
-            # Step 9: Explanation Generation (V2.0)
-            # ================================================================
-            if self._explanation_engine is not None:
-                rule_outputs = {
-                    "baseline": baseline_result,
-                    "variability": variability_result,
-                    "decelerations": decelerations,
-                    "tachysystole": tachysystole_result,
-                    "sinusoidal": sinusoidal_result,
-                    "accelerations": accelerations,
-                }
-
-                explanation_result = self._explanation_engine.explain(
-                    category=final_category,
-                    confidence=confidence,
-                    rule_outputs=rule_outputs,
-                    fhr_length=len(fhr_clean),
-                    ml_features=feature_vector.vector if self._classifier_loaded else None,
-                    compute_shap=compute_shap
-                )
+            # Map Stage 5 Tier to Category
+            # Tier 3 -> Category 3 (Severe)
+            # Tier 2 -> Category 2 (Warning)
+            # Tier 1 -> Category 2 (AI Alert)
+            # No Alert -> Category 1 (Normal)
+            final_category = 1
+            if decision.tier == Tier.TIER_3.value:
+                final_category = 3
+            elif decision.tier == Tier.TIER_2.value or decision.tier == Tier.TIER_1.value:
+                final_category = 2
 
             # ================================================================
             # Compile Findings
             # ================================================================
+            # Dummy override result for compatibility
+            from src.analysis.override import MedicalOverride, OverrideReason
+            override_result = MedicalOverride(
+                should_override=decision.tier == Tier.TIER_3.value,
+                final_category=final_category - 1,
+                reason=OverrideReason.NONE,
+                ml_prediction=ml_prediction,
+                explanation=decision.summary
+            )
+
             findings = self._compile_findings(
                 baseline_result,
                 variability_result,
@@ -531,17 +484,15 @@ class PipelineAdapter:
 
             return {
                 'category': final_category,
-                'alert': alert,
+                'alert': None,
                 'findings': findings,
                 'confidence': confidence,
-                'ml_prediction': ml_prediction + 1,  # 1-indexed
-                'was_overridden': override_result.should_override,
-                'was_trend_overridden': was_trend_overridden,
+                'ml_prediction': ml_prediction + 1,
+                'was_overridden': decision.tier == Tier.TIER_3.value,
                 'insufficient_data': False,
-                # V2.0 additions
                 'mhr_alert': mhr_result.to_dict() if mhr_result and mhr_result.is_suspected else None,
-                'trend': trend_result.to_dict() if trend_result else None,
-                'explanation': explanation_result.to_dict() if explanation_result else None,
+                'explanation': decision.summary,
+                'stage5_decision': decision.to_dict()
             }
 
         except Exception as e:

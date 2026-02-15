@@ -102,6 +102,38 @@ export interface MHRAlert {
   message?: string
 }
 
+// Clinical Findings interfaces
+export interface DecelerationFindings {
+  late_count: number
+  variable_count: number
+  early_count: number
+  prolonged_count: number
+  total_count: number
+  recurrent: boolean
+}
+
+export interface VariabilityFindings {
+  value_bpm: number
+  category: string
+  is_concerning: boolean
+}
+
+export interface BaselineFindings {
+  value_bpm: number
+  status: string
+  is_stable: boolean
+}
+
+export interface ClinicalFindings {
+  decelerations: DecelerationFindings
+  variability: VariabilityFindings
+  baseline: BaselineFindings
+  accelerations_present: boolean
+  tachysystole: boolean
+  sinusoidal: boolean
+  contraction_frequency: number
+}
+
 // WebSocket update (streaming)
 export interface WSPatientUpdate {
   patient_id: string
@@ -112,7 +144,7 @@ export interface WSPatientUpdate {
   uc_latest: number[]
   fsqi: number
   confidence: number
-  findings: Record<string, unknown>
+  findings: ClinicalFindings
   // V2.0 fields
   mhr_alert?: MHRAlert | null
   trend_score?: number
@@ -152,7 +184,7 @@ export interface WSMessage {
 }
 
 // Event injection (God Mode)
-export type EventType = 
+export type EventType =
   | 'LATE_DECEL'
   | 'VARIABLE_DECEL'
   | 'PROLONGED_DECEL'

@@ -59,7 +59,8 @@ from src.config import CTG, THRESHOLDS, COLORS, PATHS, MODEL
 # ============================================================================
 # MODULAR PIPELINE (NEW)
 # ============================================================================
-from src.pipeline import PipelineContainer, AnalysisPipeline, AnalysisResult
+# Temporarily comment out missing pipeline imports
+# from src.pipeline import PipelineContainer, AnalysisPipeline, AnalysisResult
 
 # ============================================================================
 # INTERFACES (for custom implementations)

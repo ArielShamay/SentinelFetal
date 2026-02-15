@@ -5,26 +5,26 @@ import { CategoryBadge, CTGChart, ChartControls, TrendPanel, ExplanationPanel } 
 import { FindingsPanel } from '../components/panels/FindingsPanel'
 import { api } from '../services'
 import type { PatientSnapshot, Alert, WSPatientUpdate } from '../types'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Activity } from 'lucide-react'
 
 export const DetailView: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>()
   const navigate = useNavigate()
-  
-  const patient = usePatientStore(state => 
+
+  const patient = usePatientStore(state =>
     patientId ? state.patients.get(patientId) : undefined
   )
-  
+
   // Get live update for MHR alert
   const liveUpdate = usePatientStore(state =>
     patientId ? state.liveUpdates.get(patientId) : undefined
   )
-  
+
   const [detail, setDetail] = useState<PatientSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const updateSnapshot = usePatientStore(state => state.updatePatientSnapshot)
-  
+
   // Check for MHR detection
   const isMHR = liveUpdate?.mhr_alert?.is_mhr ?? false
 
@@ -33,7 +33,7 @@ export const DetailView: React.FC = () => {
     (detail && detail.patient_id === patientId) ||
     liveUpdate
   )
-  
+
   // Fetch full patient detail with extended history
   useEffect(() => {
     if (!patientId) return
@@ -68,24 +68,24 @@ export const DetailView: React.FC = () => {
       cancelled = true
     }
   }, [patientId, updateSnapshot])
-  
+
   if (!patientId) {
     return <NotFoundState onBack={() => navigate('/')} />
   }
-  
+
   const hasAnyData = hasFallbackData
 
   if (loading && !hasAnyData) {
     return <LoadingState />
   }
-  
+
   if (error && !liveUpdate) {
     return <ErrorState error={error} onRetry={() => window.location.reload()} />
   }
-  
+
   // Use real-time data from WebSocket, or convert live update to snapshot format
   let currentData = patient ?? detail
-  
+
   // If we have live update but no full snapshot, create a minimal snapshot
   if (!currentData && liveUpdate) {
     const fhrHistory = liveUpdate.fhr_latest || []
@@ -112,11 +112,11 @@ export const DetailView: React.FC = () => {
       last_update: Date.now(),
     } as PatientSnapshot
   }
-  
+
   if (!currentData) {
     return <NotFoundState onBack={() => navigate('/')} />
   }
-  
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Back button & Header */}
@@ -127,7 +127,7 @@ export const DetailView: React.FC = () => {
         >
           ← Back to Ward View
         </button>
-        
+
         {/* MHR Alert Banner */}
         {isMHR && (
           <div className="bg-purple-900/40 border-2 border-purple-500/70 rounded-lg p-4 mb-4 shadow-lg">
@@ -172,7 +172,7 @@ export const DetailView: React.FC = () => {
           )}
         </div>
       </div>
-      
+
       {currentData ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main vitals panel */}
@@ -186,15 +186,15 @@ export const DetailView: React.FC = () => {
               />
             )}
           </div>
-          
+
           {/* Sidebar */}
           <div className="space-y-6">
-            <TrendPanel 
+            <TrendPanel
               data={currentData.trend_data ? {
                 deteriorationScore: liveUpdate?.trend_score ?? currentData.trend_data.deterioration_score,
-                variabilityTrend: (liveUpdate?.trend_slope ?? currentData.trend_data.variability_slope) > 0 ? 'increasing' 
-                  : (liveUpdate?.trend_slope ?? currentData.trend_data.variability_slope) < 0 ? 'decreasing' 
-                  : 'stable',
+                variabilityTrend: (liveUpdate?.trend_slope ?? currentData.trend_data.variability_slope) > 0 ? 'increasing'
+                  : (liveUpdate?.trend_slope ?? currentData.trend_data.variability_slope) < 0 ? 'decreasing'
+                    : 'stable',
                 decelsIn30min: currentData.trend_data.decel_count_30min,
                 lateDecelsIn15min: currentData.trend_data.late_decel_count_15min,
                 alerts: currentData.trend_data.alerts.map(a => a.message),
@@ -202,13 +202,13 @@ export const DetailView: React.FC = () => {
                 deteriorationScore: liveUpdate.trend_score,
                 variabilityTrend: liveUpdate.trend_slope && liveUpdate.trend_slope > 0 ? 'increasing'
                   : liveUpdate.trend_slope && liveUpdate.trend_slope < 0 ? 'decreasing'
-                  : 'stable',
+                    : 'stable',
                 decelsIn30min: 0,
                 lateDecelsIn15min: 0,
                 alerts: [],
               } : undefined}
             />
-            <ExplanationPanel 
+            <ExplanationPanel
               data={(currentData.explanation ?? liveUpdate?.explanation) ? {
                 category: currentData.category ?? liveUpdate?.category ?? 1,
                 primaryReason: (currentData.explanation ?? liveUpdate?.explanation)?.primary_reason ?? '',
@@ -336,19 +336,19 @@ const CTGChartPanel: React.FC<{
   liveUpdate?: WSPatientUpdate | null
 }> = ({ patientId, snapshot, liveUpdate }) => {
   const [timeRange, setTimeRange] = useState<number | null>(10)
-  
+
   const handleZoomIn = useCallback(() => {
     setTimeRange(prev => prev ? Math.max(1, prev - 2) : 5)
   }, [])
-  
+
   const handleZoomOut = useCallback(() => {
     setTimeRange(prev => prev ? prev + 5 : 15)
   }, [])
-  
+
   const handleReset = useCallback(() => {
     setTimeRange(10)
   }, [])
-  
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="p-4 border-b border-gray-200">

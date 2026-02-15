@@ -5,46 +5,18 @@
 
 import React from 'react'
 import { Activity, TrendingDown, Heart, Waves } from 'lucide-react'
+import type { ClinicalFindings } from '../../types'
 
-interface DecelerationFindings {
-  late_count: number
-  variable_count: number
-  early_count: number
-  prolonged_count: number
-  total_count: number
-  recurrent: boolean
-}
 
-interface VariabilityFindings {
-  value_bpm: number
-  category: string
-  is_concerning: boolean
-}
-
-interface BaselineFindings {
-  value_bpm: number
-  status: string
-  is_stable: boolean
-}
-
-interface ClinicalFindings {
-  decelerations: DecelerationFindings
-  variability: VariabilityFindings
-  baseline: BaselineFindings
-  accelerations_present: boolean
-  tachysystole: boolean
-  sinusoidal: boolean
-  contraction_frequency: number
-}
 
 interface FindingsPanelProps {
   findings: ClinicalFindings
   className?: string
 }
 
-export const FindingsPanel: React.FC<FindingsPanelProps> = ({ 
+export const FindingsPanel: React.FC<FindingsPanelProps> = ({
   findings,
-  className = '' 
+  className = ''
 }) => {
   const { decelerations, variability, baseline, contraction_frequency } = findings
 
@@ -75,7 +47,7 @@ export const FindingsPanel: React.FC<FindingsPanelProps> = ({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        
+
         {/* Decelerations */}
         <div className="col-span-2 bg-gray-50 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
@@ -87,7 +59,7 @@ export const FindingsPanel: React.FC<FindingsPanelProps> = ({
               </span>
             )}
           </div>
-          
+
           <div className="grid grid-cols-4 gap-2 text-center">
             <div className={`p-2 rounded ${decelerations.late_count > 0 ? 'bg-red-100' : 'bg-white'}`}>
               <div className={`text-lg font-bold ${decelerations.late_count > 0 ? 'text-red-600' : 'text-gray-400'}`}>

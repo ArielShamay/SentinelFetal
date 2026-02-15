@@ -1,91 +1,15 @@
 [project]
 name = "sentinelfetal"
-version = "3.0.0"
-description = "Real-time CTG monitoring with AI classification"
-readme = "README.md"
-requires-python = ">=3.9"
-license = {text = "MIT"}
-
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
 dependencies = [
-    # Existing dependencies
-    "numpy>=1.24.0",
-    "pandas>=2.0.0",
-    "scipy>=1.10.0",
-    "wfdb>=4.1.0",
-    "matplotlib>=3.7.0",
-    "plotly>=5.14.0",
-    "scikit-learn>=1.2.0",
-    "sktime>=0.24.0",
-    "numba>=0.58.0",
-    "pywavelets>=1.4.0",
-    "onnx>=1.14.0",
-    "onnxruntime>=1.15.0",
-    "tqdm>=4.65.0",
-    "python-dateutil>=2.8.0",
-    "psutil>=5.9.0",
-    "joblib>=1.3.0",
-    # NEW: FastAPI dependencies
-    "fastapi>=0.109.0",
-    "uvicorn[standard]>=0.27.0",
-    "pydantic>=2.5.0",
-    "pydantic-settings>=2.1.0",
-    "msgpack>=1.0.7",
-    "python-multipart>=0.0.6",
-    "websockets>=12.0",
+    "fastapi>=0.128.0",
+    "numpy>=2.4.1",
+    "pandas>=3.0.0",
+    "pydantic-settings>=2.12.0",
+    "scikit-learn>=1.8.0",
+    "scipy>=1.17.0",
+    "uvicorn>=0.40.0",
+    "xgboost>=3.1.3",
 ]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.3.0",
-    "pytest-cov>=4.1.0",
-    "pytest-asyncio>=0.23.0",
-    "httpx>=0.26.0",
-    "black>=24.1.0",
-    "isort>=5.13.0",
-    "ruff>=0.1.14",
-    "mypy>=1.8.0",
-    "pre-commit>=3.6.0",
-]
-
-streamlit = [
-    "streamlit>=1.28.0",
-    "streamlit-echarts>=0.4.0",
-]
-
-[tool.black]
-line-length = 100
-target-version = ["py39", "py310", "py311", "py312"]
-exclude = '''
-/(
-    \.git
-    | \.venv
-    | __pycache__
-    | frontend
-    | node_modules
-)/
-'''
-
-[tool.isort]
-profile = "black"
-line_length = 100
-skip = [".venv", "frontend", "node_modules"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py39"
-exclude = [".venv", "frontend", "node_modules"]
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "C4"]
-ignore = ["E501"]
-
-[tool.mypy]
-python_version = "3.9"
-warn_return_any = true
-warn_unused_configs = true
-ignore_missing_imports = true
-exclude = ["frontend", "node_modules", ".venv"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests", "api/tests"]
-asyncio_mode = "auto"

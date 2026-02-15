@@ -337,3 +337,157 @@ def get_final_classification(
         sinusoidal=sinusoidal
     )
     return override.final_category, override.explanation
+
+
+# =============================================================================
+# Stage 5: Rule Score Calculation
+# =============================================================================
+
+@dataclass
+class RuleScoreResult:
+    """
+    Result of rule score calculation for Stage 5 Tiering.
+    
+    Attributes:
+        score: Aggregate rule score (0.0 - 1.0).
+        is_severe: Whether any critical rule was triggered (Tier-3 eligible).
+        rule_hits: List of rule names that were triggered.
+        reason_codes: List of reason codes for explainability.
+    """
+    score: float
+    is_severe: bool
+    rule_hits: List[str]
+    reason_codes: List[str]
+
+
+def calculate_rule_score(
+    baseline: BaselineResult,
+    variability: VariabilityResult,
+    decelerations: List[Deceleration],
+    tachysystole: TachysystoleResult,
+    sinusoidal: SinusoidalResult
+) -> RuleScoreResult:
+    """
+    Calculate aggregate rule score for Stage 5 Tiering.
+    
+    This function computes a 0-1 score based on clinical findings.
+    Higher scores indicate more concerning patterns.
+    
+    Scoring weights (based on clinical severity):
+    - Sinusoidal pattern: 1.0 (maximum - always severe)
+    - Absent variability: 0.4
+    - Minimal variability: 0.15
+    - Late decelerations: 0.3 per occurrence (max 0.6)
+    - Variable decelerations: 0.2 per occurrence (max 0.4)
+    - Prolonged decelerations: 0.25 per occurrence
+    - Bradycardia: 0.35
+    - Tachycardia: 0.2
+    - Tachysystole: 0.2
+    
+    Args:
+        baseline: Baseline analysis result.
+        variability: Variability analysis result.
+        decelerations: List of detected decelerations.
+        tachysystole: Tachysystole detection result.
+        sinusoidal: Sinusoidal pattern detection result.
+        
+    Returns:
+        RuleScoreResult with aggregate score and details.
+    """
+    score = 0.0
+    is_severe = False
+    rule_hits: List[str] = []
+    reason_codes: List[str] = []
+    
+    # --- Sinusoidal Pattern (Critical - Tier 3) ---
+    if sinusoidal.detected:
+        score = 1.0  # Maximum score
+        is_severe = True
+        rule_hits.append("SINUSOIDAL")
+        reason_codes.append("RULE_SINUSOIDAL_PATTERN")
+        # Return immediately - this is the most severe finding
+        return RuleScoreResult(
+            score=score,
+            is_severe=is_severe,
+            rule_hits=rule_hits,
+            reason_codes=reason_codes
+        )
+    
+    # --- Variability ---
+    is_absent = (
+        variability.category == VariabilityCategory.ABSENT or
+        (isinstance(variability.category, str) and variability.category.lower() == 'absent')
+    )
+    is_minimal = (
+        variability.category == VariabilityCategory.MINIMAL or
+        (isinstance(variability.category, str) and variability.category.lower() == 'minimal')
+    )
+    
+    if is_absent:
+        score += 0.4
+        rule_hits.append("ABSENT_VARIABILITY")
+        reason_codes.append("RULE_ABSENT_VARIABILITY")
+    elif is_minimal:
+        score += 0.15
+        rule_hits.append("MINIMAL_VARIABILITY")
+        reason_codes.append("RULE_MINIMAL_VARIABILITY")
+    
+    # --- Decelerations ---
+    late_count = sum(1 for d in decelerations 
+                     if d.decel_type == DecelerationType.LATE or
+                     (isinstance(d.decel_type, str) and d.decel_type.lower() == 'late'))
+    variable_count = sum(1 for d in decelerations 
+                         if d.decel_type == DecelerationType.VARIABLE or
+                         (isinstance(d.decel_type, str) and d.decel_type.lower() == 'variable'))
+    prolonged_count = sum(1 for d in decelerations 
+                          if d.decel_type == DecelerationType.PROLONGED or
+                          (isinstance(d.decel_type, str) and d.decel_type.lower() == 'prolonged'))
+    
+    if late_count > 0:
+        score += min(late_count * 0.3, 0.6)  # Cap at 0.6
+        rule_hits.append(f"LATE_DECELS_{late_count}")
+        reason_codes.append("RULE_LATE_DECELERATION")
+    
+    if variable_count > 0:
+        score += min(variable_count * 0.2, 0.4)  # Cap at 0.4
+        rule_hits.append(f"VARIABLE_DECELS_{variable_count}")
+        reason_codes.append("RULE_VARIABLE_DECELERATION")
+    
+    if prolonged_count > 0:
+        score += prolonged_count * 0.25
+        rule_hits.append(f"PROLONGED_DECELS_{prolonged_count}")
+        reason_codes.append("RULE_PROLONGED_DECELERATION")
+    
+    # --- Baseline Abnormalities ---
+    if baseline.is_bradycardia:
+        score += 0.35
+        rule_hits.append("BRADYCARDIA")
+        reason_codes.append("RULE_BRADYCARDIA")
+    
+    if baseline.is_tachycardia:
+        score += 0.2
+        rule_hits.append("TACHYCARDIA")
+        reason_codes.append("RULE_TACHYCARDIA")
+    
+    # --- Tachysystole ---
+    if tachysystole.detected:
+        score += 0.2
+        rule_hits.append("TACHYSYSTOLE")
+        reason_codes.append("RULE_TACHYSYSTOLE")
+    
+    # --- Check for Severe Combination (Tier-3 eligible) ---
+    # Absent variability + any concerning finding = severe
+    if is_absent and (late_count >= 3 or variable_count >= 3 or baseline.is_bradycardia):
+        is_severe = True
+        reason_codes.append("COMBINATION_ABSENT_VAR_WITH_DECELS_OR_BRADY")
+    
+    # Cap score at 1.0
+    score = min(score, 1.0)
+    
+    return RuleScoreResult(
+        score=round(score, 3),
+        is_severe=is_severe,
+        rule_hits=rule_hits,
+        reason_codes=reason_codes
+    )
+

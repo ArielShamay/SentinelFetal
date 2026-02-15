@@ -23,7 +23,13 @@ from typing import Any, Generator, Optional, Union
 
 import numpy as np
 import pandas as pd
-import wfdb
+import pandas as pd
+try:
+    import wfdb
+    WFDB_AVAILABLE = True
+except ImportError:
+    WFDB_AVAILABLE = False
+    wfdb = None
 
 from src.config import THRESHOLDS
 
@@ -214,6 +220,8 @@ class CTUDataLoader:
         
         try:
             # Load using wfdb
+            if not WFDB_AVAILABLE:
+                raise ImportError("wfdb library not installed. Cannot load real records.")
             record = wfdb.rdrecord(str(record_path))
         except Exception as e:
             raise InvalidRecordError(
