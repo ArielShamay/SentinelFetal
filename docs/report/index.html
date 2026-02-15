@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SentinelFetal - Architecture v4.5 (Modular)</title>
+
+    <!-- Fonts & Icons -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Data & App Logic -->
+    <script src="js/data.js"></script>
+    <script src="js/docs_content.js"></script>
+
+    <!-- App Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body onload="initApp()">
+
+    <header>
+        <div class="brand"><i class="fas fa-network-wired"></i> SENTINEL v4.5</div>
+        <div class="nav-tabs">
+            <button class="nav-btn active" onclick="setView('report')">Live Status</button>
+            <button class="nav-btn" onclick="setView('plan1')">Stage 1 Deep Dive</button>
+            <button class="nav-btn" onclick="setView('mega')">MegaFlow</button>
+            <button class="nav-btn" onclick="setView('stages')">Stages Breakdown</button>
+            <button class="nav-btn" onclick="setView('arch')">Architecture Map</button>
+            <button class="nav-btn" onclick="setView('docs')">Technical Docs</button>
+        </div>
+        <div style="width: 100px;"></div>
+    </header>
+
+    <main>
+        <!-- === TAB 1: GAP ANALYSIS === -->
+        <div id="view-report" class="view-layer active">
+            <div class="scroll-content">
+                <div class="container">
+                    <h1 style="text-align: center; margin-bottom: 40px; color:white;">דוח פערים: מצוי vs רצוי</h1>
+                    <div class="mermaid-wrapper">
+                        <div class="mermaid">
+                            graph TD
+                            Ingest["1. Ingest + Preflight"]:::partial --> QGate["2. Quality Gate RAW"]:::missing
+                            QGate --> Window["3. Windowing (20m, s5)"]:::partial
+                            Window --> Rules["4. Rules Engine"]:::done
+                            Window --> AI["5. AI Scoring"]:::partial
+                            Rules --> Hybrid["6. Hybrid Decision"]:::missing
+                            AI --> Hybrid
+                            Hybrid --> Output["7. Output Contract"]:::partial
+
+                            classDef done fill:#d4edda,stroke:#28a745,color:black;
+                            classDef partial fill:#fff3cd,stroke:#ffc107,stroke-dasharray: 5
+                            5,color:black,stroke-width:2px;
+                            classDef missing fill:#f8d7da,stroke:#dc3545,stroke-dasharray: 5
+                            5,color:black,stroke-width:2px;
+                        </div>
+                    </div>
+                    <div id="gap-root"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- === TAB 2: STAGE 1 DEEP DIVE === -->
+        <div id="view-plan1" class="view-layer">
+            <div class="step-container">
+                <div class="step-nav" id="plan-nav-root"></div>
+                <div class="step-detail" id="plan-content-root"></div>
+            </div>
+        </div>
+
+        <!-- === TAB 3: MEGA FLOW === -->
+        <div id="view-mega" class="view-layer">
+            <div class="canvas-container" id="canvas">
+                <div class="mega-content" id="mega-root"></div>
+            </div>
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="zoomCanvas(-0.1)"><i class="fas fa-minus"></i></button>
+                <button class="zoom-btn" onclick="zoomCanvas(0.1)"><i class="fas fa-plus"></i></button>
+            </div>
+        </div>
+
+        <!-- === TAB 4: STAGES BREAKDOWN === -->
+        <div id="view-stages" class="view-layer">
+            <div class="docs-layout">
+                <!-- Sidebar -->
+                <div class="docs-sidebar">
+                    <div class="docs-toc-header">Stages</div>
+                    <div id="stages-sidebar-root"></div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="docs-main">
+                    <div class="docs-toolbar">
+                        <button class="font-btn" onclick="adjustFontSize(-1)"><i class="fas fa-minus"></i></button>
+                        <span class="font-label">גודל טקסט</span>
+                        <button class="font-btn" onclick="adjustFontSize(1)"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="scroll-content" id="stages-scroll-area">
+                        <div class="container" id="stages-root"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- === TAB 5: ARCHITECTURE MAP === -->
+        <div id="view-arch" class="view-layer">
+            <div class="scroll-content">
+                <div class="container">
+                    <h1 style="text-align: center; margin-bottom: 20px; color:white;">
+                        <i class="fas fa-sitemap" style="color: var(--neon-blue);"></i>
+                        מפת ארכיטקטורה - זרימת קוד
+                    </h1>
+                    <p style="text-align: center; color: #888; margin-bottom: 40px; font-size: 1.1rem;">
+                        תמונה מפורטת של כל השלבים, תת-השלבים, הקבצים והפונקציות בפייפליין
+                    </p>
+                    <div id="arch-root"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- === TAB 6: DOCS === -->
+        <div id="view-docs" class="view-layer">
+            <div class="docs-layout">
+                <!-- Sidebar -->
+                <div class="docs-sidebar">
+                    <div class="docs-toc-header">תוכן עניינים</div>
+                    <div id="docs-sidebar-root"></div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="docs-main">
+                    <div class="docs-toolbar">
+                        <button class="font-btn" onclick="adjustFontSize(-1)"><i class="fas fa-minus"></i></button>
+                        <span class="font-label">גודל טקסט</span>
+                        <button class="font-btn" onclick="adjustFontSize(1)"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="scroll-content" id="docs-scroll-area">
+                        <div class="container" id="docs-root"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Data & App Logic -->
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+
+</body>
+
+</html>
